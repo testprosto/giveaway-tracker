@@ -1,24 +1,17 @@
-"""Vercel Serverless Function - Giveaway Tracker API."""
+"""Vercel Serverless Function - Simple HTTP Handler."""
 
 import asyncio
+import json
 import os
 from datetime import datetime, timedelta
-from typing import List
-from pathlib import Path
-
+from http.server import BaseHTTPRequestHandler
+from urllib.parse import parse_qs, urlparse
 import aiohttp
 from bs4 import BeautifulSoup
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
-
-app = FastAPI()
-templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates")
-
 
 class Giveaway:
     """Модель раздачи."""
-    def __init__(self, platform: str, title: str, price: str, url: str, end_date: str = None, image: str = None, desc: str = None):
+    def __init__(self, platform, title, price, url, end_date=None, image=None, desc=None):
         self.platform = platform
         self.title = title
         self.original_price = price
@@ -27,7 +20,6 @@ class Giveaway:
         self.end_date = end_date
         self.image_url = image
         self.description = desc
-        self.created_at = datetime.now().isoformat()
         self.time_components = self._get_time() if end_date else {'days': 0, 'hours': 0, 'minutes': 0, 'seconds': 0}
         self.is_expired = self._is_expired()
 
@@ -52,16 +44,10 @@ class Giveaway:
             return False
 
     def to_dict(self):
-        return {
-            'platform': self.platform, 'title': self.title, 'original_price': self.original_price,
-            'discount_price': self.discount_price, 'url': self.url, 'end_date': self.end_date,
-            'description': self.description, 'image_url': self.image_url, 'is_expired': self.is_expired,
-            'time_components': self.time_components
-        }
+        return {'platform': self.platform, 'title': self.title, 'original_price': self.original_price, 'discount_price': self.discount_price, 'url': self.url, 'end_date': self.end_date, 'description': self.description, 'image_url': self.image_url, 'is_expired': self.is_expired, 'time_components': self.time_components}
 
 
 async def get_epic(session):
-    """Epic Games Store."""
     result = []
     try:
         async with session.get("https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions", timeout=10) as r:
@@ -89,10 +75,9 @@ async def get_epic(session):
 
 
 async def get_steam(session):
-    """Steam."""
     result = []
     try:
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        headers = {"User-Agent": "Mozilla/5.0"}
         async with session.get("https://store.steampowered.com/search/?maxprice=free", headers=headers, timeout=10) as r:
             if r.status != 200:
                 return result
@@ -113,7 +98,6 @@ async def get_steam(session):
 
 
 async def get_gog(session):
-    """GOG."""
     result = []
     try:
         headers = {"User-Agent": "Mozilla/5.0"}
@@ -134,15 +118,11 @@ async def get_gog(session):
     except Exception as e:
         print(f"GOG error: {e}")
     if not result:
-        result = [
-            Giveaway("GOG", "The Witcher 3", "$39.99", "https://www.gog.com/en/game/the_witcher_3", (datetime.now() + timedelta(days=2)).strftime("%Y-%m-%d"), desc="Free weekend"),
-            Giveaway("GOG", "Cyberpunk 2077", "$59.99", "https://www.gog.com/en/game/cyberpunk_2077", desc="Free to keep")
-        ]
+        result = [Giveaway("GOG", "The Witcher 3", "$39.99", "https://www.gog.com/en/game/the_witcher_3", (datetime.now() + timedelta(days=2)).strftime("%Y-%m-%d"), desc="Free weekend"), Giveaway("GOG", "Cyberpunk 2077", "$59.99", "https://www.gog.com/en/game/cyberpunk_2077", desc="Free to keep")]
     return result
 
 
 async def get_humble(session):
-    """Humble Bundle."""
     result = []
     try:
         headers = {"User-Agent": "Mozilla/5.0"}
@@ -163,7 +143,6 @@ async def get_humble(session):
 
 
 async def get_itchio(session):
-    """itch.io."""
     result = []
     try:
         headers = {"User-Agent": "Mozilla/5.0"}
@@ -179,20 +158,13 @@ async def get_itchio(session):
     except Exception as e:
         print(f"itch.io error: {e}")
     if not result:
-        result = [
-            Giveaway("itch.io", "Celeste Classic", "N/A", "https://itch.io", desc="Platformer"),
-            Giveaway("itch.io", "Deltarune", "N/A", "https://itch.io", desc="RPG")
-        ]
+        result = [Giveaway("itch.io", "Celeste Classic", "N/A", "https://itch.io", desc="Platformer"), Giveaway("itch.io", "Deltarune", "N/A", "https://itch.io", desc="RPG")]
     return result
 
 
 async def collect_all():
-    """Собрать все раздачи."""
     async with aiohttp.ClientSession() as session:
-        results = await asyncio.gather(
-            get_epic(session), get_steam(session), get_gog(session), get_humble(session), get_itchio(session),
-            return_exceptions=True
-        )
+        results = await asyncio.gather(get_epic(session), get_steam(session), get_gog(session), get_humble(session), get_itchio(session), return_exceptions=True)
         all_games = []
         for r in results:
             if isinstance(r, list):
@@ -205,47 +177,66 @@ async def collect_all():
         return unique
 
 
-@app.get("/")
-async def root(request: Request):
-    """Главная страница."""
-    try:
-        giveaways = await collect_all()
-        platforms = list(set(g.platform for g in giveaways))
-        return templates.TemplateResponse("index.html", {
-            "request": request,
-            "giveaways": giveaways,
-            "platforms": platforms,
-            "total": len(giveaways),
-            "total_platforms": len(platforms)
-        }, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
-    except Exception as e:
-        return HTMLResponse(content=f"<h1>Error: {str(e)}</h1><p>Check Vercel logs for details</p>", status_code=500)
+# Load HTML template
+HTML_TEMPLATE = None
+def get_template():
+    global HTML_TEMPLATE
+    if HTML_TEMPLATE is None:
+        template_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'index.html')
+        try:
+            with open(template_path, 'r', encoding='utf-8') as f:
+                HTML_TEMPLATE = f.read()
+        except:
+            HTML_TEMPLATE = "<html><body><h1>Error loading template</h1></body></html>"
+    return HTML_TEMPLATE
 
 
-@app.get("/api/giveaways")
-async def api_giveaways(refresh: int = None, platform: str = None):
-    """API для получения раздач."""
-    try:
-        giveaways = await collect_all()
-        if platform:
-            giveaways = [g for g in giveaways if platform.lower() in g.platform.lower()]
-        return JSONResponse([g.to_dict() for g in giveaways], headers={"Cache-Control": "max-age=3600"})
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+def render_template(template, **kwargs):
+    """Simple template renderer."""
+    result = template
+    for key, value in kwargs.items():
+        if isinstance(value, (list, dict)):
+            continue
+        result = result.replace('{{' + key + '}}', str(value))
+    return result
 
 
-@app.get("/api/stats")
-async def api_stats():
-    """Статистика."""
-    try:
-        giveaways = await collect_all()
-        stats = {"total": len(giveaways), "by_platform": {}}
-        for g in giveaways:
-            stats["by_platform"][g.platform] = stats["by_platform"].get(g.platform, 0) + 1
-        return JSONResponse(stats)
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
-
-
-# Vercel entry point
-handler = app
+class handler(BaseHTTPRequestHandler):
+    """HTTP Request Handler for Vercel."""
+    
+    def do_GET(self):
+        parsed = urlparse(self.path)
+        path = parsed.path
+        query = parse_qs(parsed.query)
+        
+        if path == '/api/giveaways':
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Cache-Control', 'max-age=3600')
+            self.end_headers()
+            giveaways = asyncio.run(collect_all())
+            self.wfile.write(json.dumps([g.to_dict() for g in giveaways]).encode())
+        
+        elif path == '/api/stats':
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            giveaways = asyncio.run(collect_all())
+            stats = {'total': len(giveaways), 'by_platform': {}}
+            for g in giveaways:
+                stats['by_platform'][g.platform] = stats['by_platform'].get(g.platform, 0) + 1
+            self.wfile.write(json.dumps(stats).encode())
+        
+        else:
+            giveaways = asyncio.run(collect_all())
+            platforms = list(set(g.platform for g in giveaways))
+            template = get_template()
+            html = render_template(template, total=len(giveaways), total_platforms=len(platforms))
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/html; charset=utf-8')
+            self.send_header('Cache-Control', 'no-cache')
+            self.end_headers()
+            self.wfile.write(html.encode('utf-8'))
+    
+    def log_message(self, format, *args):
+        print(f"{self.address_string()} - {format % args}")
