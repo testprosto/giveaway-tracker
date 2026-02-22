@@ -7,7 +7,6 @@ from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 import aiohttp
-from bs4 import BeautifulSoup
 
 class Giveaway:
     """Модель раздачи."""
@@ -84,7 +83,6 @@ async def get_epic(session):
                             
                             img = next((i.get("url") for i in game.get("keyImages", []) if i.get("type") in ["OfferImageWide", "Thumbnail", "DieselStoreFrontWide"]), None)
                             
-                            # Правильный URL для Epic Games
                             url = "https://store.epicgames.com/"
                             if slug:
                                 clean_slug = slug.split('/')[-1] if '/' in slug else slug
@@ -108,87 +106,134 @@ async def get_epic(session):
     return result
 
 
-async def get_steam(session):
-    """Steam - игры со 100% скидкой."""
+async def get_steam_specials(session):
+    """Steam - игры со 100% скидкой через API."""
+    result = []
+    
+    try:
+        # Steam API для специальных предложений
+        async with session.get(
+            "https://store.steampowered.com/api/featuredcategories/",
+            timeout=10
+        ) as r:
+            if r.status != 200:
+                print(f"Steam API status: {r.status}")
+                return result
+            
+            data = await r.json()
+            
+            # Ищем секции со скидками
+            for key, section in data.items():
+                if not isinstance(section, dict):
+                    continue
+                    
+                items = section.get('items', [])
+                if not items:
+                    continue
+                
+                for item in items:
+                    # Проверяем 100% скидку
+                    discount = item.get('discount', 0)
+                    if discount == 100:
+                        appid = item.get('id', 0)
+                        title = item.get('name', 'Unknown')
+                        
+                        # Изображение
+                        header_img = item.get('header_image', '')
+                        
+                        # Оригинальная цена
+                        orig_price = item.get('original_price', 0)
+                        price_str = f"${orig_price/100:.2f}" if orig_price else "N/A"
+                        
+                        url = f"https://store.steampowered.com/app/{appid}/"
+                        end_date = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d")
+                        
+                        result.append(Giveaway(
+                            platform="Steam",
+                            title=title,
+                            price=price_str,
+                            url=url,
+                            image=header_img,
+                            desc="100% Off - Limited Time!",
+                            end_date=end_date,
+                            is_permanent=False
+                        ))
+    
+    except Exception as e:
+        print(f"Steam API error: {e}")
+    
+    # Если через API не получилось, пробуем через specials страницу
+    if not result:
+        result = await get_steam_specials_page(session)
+    
+    return result
+
+
+async def get_steam_specials_page(session):
+    """Steam - парсинг страницы special offers."""
     result = []
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         "Accept": "text/html,application/xhtml+xml"
     }
     
     try:
-        # Specials page with 100% discounts
         async with session.get(
-            "https://store.steampowered.com/specials#p=0&tab=TopSellers",
+            "https://store.steampowered.com/specials",
             headers=headers,
             timeout=10
         ) as r:
             if r.status != 200:
-                print(f"Steam returned status {r.status}")
                 return result
             
+            from bs4 import BeautifulSoup
             html = await r.text()
             soup = BeautifulSoup(html, 'lxml')
             
             # Ищем игры с 100% скидкой
-            game_rows = soup.select('.tab_item')
-            
-            for game in game_rows[:30]:
-                try:
-                    title_elem = game.select_one('.tab_item_name')
-                    if not title_elem:
-                        continue
-                    
+            for game in soup.select('.tab_item')[:30]:
+                title_elem = game.select_one('.tab_item_name')
+                discount_elem = game.select_one('.discount_pct')
+                
+                if not title_elem or not discount_elem:
+                    continue
+                
+                discount_text = discount_elem.get_text(strip=True)
+                
+                if discount_text == "100%":
                     title = title_elem.get_text(strip=True)
                     
-                    # Проверяем скидку
-                    discount_elem = game.select_one('.discount_pct')
-                    if not discount_elem:
-                        continue
+                    # Ссылка из data-ds-tag1
+                    appid = game.get('data-ds-tag1', '')
+                    if appid and appid.isdigit():
+                        url = f"https://store.steampowered.com/app/{appid}/"
+                    else:
+                        link = game.select_one('a[href*="/app/"]')
+                        url = link.get('href') if link else "https://store.steampowered.com/"
                     
-                    discount_text = discount_elem.get_text(strip=True)
-                    
-                    # Только 100% скидки
-                    if discount_text != "100%":
-                        continue
-                    
-                    # Ссылка
-                    link = game.get('data-ds-tag1', '')
-                    if not link or not link.startswith('http'):
-                        link = f"https://store.steampowered.com/app/0"
+                    # Цена
+                    price_elem = game.select_one('.discount_original_price')
+                    orig_price = price_elem.get_text(strip=True) if price_elem else "N/A"
                     
                     # Изображение
                     img_elem = game.select_one('img')
                     img_url = img_elem.get('src') if img_elem else None
                     
-                    # Оригинальная цена
-                    price_elem = game.select_one('.discount_original_price')
-                    orig_price = price_elem.get_text(strip=True) if price_elem else "N/A"
-                    
-                    # Дата окончания (7 дней)
                     end_date = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d")
                     
                     result.append(Giveaway(
                         platform="Steam",
                         title=title,
                         price=orig_price,
-                        url=link,
+                        url=url,
                         image=img_url,
-                        desc="100% Off - Limited Time!",
+                        desc="100% Off!",
                         end_date=end_date,
                         is_permanent=False
                     ))
-                    
-                except Exception as e:
-                    print(f"Steam parse error: {e}")
-                    continue
     
     except Exception as e:
-        print(f"Steam error: {e}")
-    
-    # Fallback - тестовые данные если ничего не найдено
-    if not result:
-        print("Steam: No results, using fallback")
+        print(f"Steam page error: {e}")
     
     return result
 
@@ -249,7 +294,11 @@ class handler(BaseHTTPRequestHandler):
     async def _collect_giveaways(self):
         """Собрать все временные раздачи."""
         async with aiohttp.ClientSession() as session:
-            results = await asyncio.gather(get_epic(session), get_steam(session), return_exceptions=True)
+            results = await asyncio.gather(
+                get_epic(session),
+                get_steam_specials(session),
+                return_exceptions=True
+            )
             all_games = []
             for r in results:
                 if isinstance(r, list):
