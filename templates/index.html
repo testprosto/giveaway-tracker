@@ -48,6 +48,7 @@
         .time-left-badge.soon{background:linear-gradient(135deg,rgba(255,152,0,0.95),rgba(255,87,34,0.95));color:#fff}
         .time-left-badge.normal{background:linear-gradient(135deg,rgba(76,175,80,0.95),rgba(56,142,60,0.95));color:#fff}
         .time-left-badge.expired{background:linear-gradient(135deg,rgba(100,100,100,0.95),rgba(60,60,60,0.95));color:#ccc}
+        .time-left-badge.permanent{background:linear-gradient(135deg,rgba(0,212,255,0.95),rgba(131,56,236,0.95));color:#fff}
         .time-display{display:flex;align-items:center;gap:5px}
         .time-unit{display:flex;flex-direction:column;align-items:center;min-width:20px}
         .time-value{font-weight:900;font-size:0.75rem;font-family:'Orbitron',sans-serif}
@@ -72,12 +73,12 @@
 <body>
     <div class="container">
         <header>
-            <h1>🎮 FREE GAMES TRACKER BY LEVONK3</h1>
-            <p>Limited-time free games from Epic Games & Steam</p>
+            <h1>🎮 FREE GAMES TRACKER</h1>
+            <p>Free games from Epic Games & Steam</p>
             <div class="stats">
                 <div class="stat-card"><div class="number" id="statActive">0</div><div class="label">Active</div></div>
-                <div class="stat-card"><div class="number" id="statEnding">0</div><div class="label">Ending Soon</div></div>
-                <div class="stat-card"><div class="number" id="statExpired">0</div><div class="label">Expired</div></div>
+                <div class="stat-card"><div class="number" id="statLimited">0</div><div class="label">Limited Time</div></div>
+                <div class="stat-card"><div class="number" id="statPermanent">0</div><div class="label">Permanent</div></div>
             </div>
             <button class="refresh-btn" onclick="loadGames()" id="refreshBtn">🔄 Refresh</button>
         </header>
@@ -96,7 +97,7 @@
             <div class="games-grid" id="gamesGrid" style="display:none"></div>
         </main>
         
-        <footer><p>Updates every 5 minutes | Epic Games & Steam 100% Off</p></footer>
+        <footer><p>Updates every 5 minutes | Epic Games & Steam</p></footer>
     </div>
     
     <script>
@@ -120,7 +121,6 @@
                 games = await res.json();
                 platforms = [...new Set(games.map(g => g.platform))];
                 
-                // Platform filter buttons
                 document.getElementById('platformFilter').innerHTML = 
                     '<button class="platform-btn active" data-platform="all" onclick="filterByPlatform(\'all\')">All</button>' +
                     platforms.map(p => `<button class="platform-btn" data-platform="${p}" onclick="filterByPlatform('${p}')">${p}</button>`).join('');
@@ -143,16 +143,14 @@
             const grid = document.getElementById('gamesGrid');
             let filtered = games;
             
-            // Filter by tab
             if (currentTab === 'expired') {
                 filtered = games.filter(g => g.is_expired);
             } else if (currentTab === 'games') {
-                filtered = games.filter(g => !g.is_expired && !isDlc(g.title));
+                filtered = games.filter(g => !isDlc(g.title));
             } else if (currentTab === 'dlc') {
                 filtered = games.filter(g => isDlc(g.title));
             }
             
-            // Filter by platform
             if (currentPlatform !== 'all') {
                 filtered = filtered.filter(g => g.platform === currentPlatform);
             }
@@ -161,9 +159,10 @@
                 const tc = g.time_components || {days:0,hours:0,minutes:0,seconds:0};
                 const isDlcGame = isDlc(g.title);
                 
-                // Time badge - ВСЕГДА показываем время для всех игр
                 let timeBadge;
-                if (g.end_date) {
+                if (g.is_permanent) {
+                    timeBadge = '<span class="time-left-badge permanent"><span>♾️ Permanent</span></span>';
+                } else if (g.end_date) {
                     const badgeClass = g.is_expired ? 'expired' : (tc.days===0 && tc.hours<24 ? 'urgent' : tc.days===0 ? 'soon' : 'normal');
                     timeBadge = `<span class="time-left-badge ${badgeClass}" data-end-date="${g.end_date}">
                         <span class="time-display">
@@ -175,7 +174,7 @@
                         </span>
                     </span>`;
                 } else {
-                    timeBadge = '<span class="time-left-badge normal"><span>Free</span></span>';
+                    timeBadge = '<span class="time-left-badge permanent"><span>♾️ Free</span></span>';
                 }
                 
                 return `<div class="game-card ${g.is_expired ? 'expired' : ''}" data-platform="${g.platform}" data-type="${isDlcGame ? 'dlc' : 'game'}" data-status="${g.is_expired ? 'expired' : 'active'}">
@@ -188,7 +187,7 @@
                     <div class="game-content">
                         <h3 class="game-title">${g.title}</h3>
                         <div class="game-price"><span class="original-price">${g.original_price}</span><span class="free-price">FREE</span></div>
-                        ${g.end_date ? `<div class="game-end-date">${g.is_expired ? '❌ Ended: '+g.end_date : '⏰ Ends: '+g.end_date}</div>` : ''}
+                        ${g.end_date && !g.is_permanent ? `<div class="game-end-date">${g.is_expired ? '❌ Ended: '+g.end_date : '⏰ Ends: '+g.end_date}</div>` : ''}
                         ${g.description ? `<p class="game-description">${g.description}</p>` : ''}
                         ${g.is_expired ? '<span class="game-link expired">🚫 Unavailable</span>' : `<a href="${g.url}" target="_blank" class="game-link">🔗 Get Game</a>`}
                     </div>
@@ -202,15 +201,14 @@
         }
 
         function updateStats() {
-            const active = games.filter(g => !g.is_expired).length;
-            const ending = games.filter(g => !g.is_expired && g.time_components && g.time_components.days === 0 && g.time_components.hours < 48).length;
+            const permanent = games.filter(g => g.is_permanent).length;
+            const limited = games.filter(g => !g.is_permanent && !g.is_expired).length;
             const expired = games.filter(g => g.is_expired).length;
             
-            document.getElementById('statActive').textContent = active;
-            document.getElementById('statEnding').textContent = ending;
-            document.getElementById('statExpired').textContent = expired;
+            document.getElementById('statActive').textContent = limited + permanent;
+            document.getElementById('statLimited').textContent = limited;
+            document.getElementById('statPermanent').textContent = permanent;
             
-            // Tab counts
             const allGames = games.length;
             const onlyGames = games.filter(g => !isDlc(g.title)).length;
             const onlyDlcs = games.filter(g => isDlc(g.title)).length;
@@ -233,13 +231,11 @@
             renderGames();
         }
 
-        // Real-time countdown
         setInterval(() => {
             const now = new Date();
             document.querySelectorAll('.time-left-badge[data-end-date]').forEach(badge => {
                 const endDate = new Date(badge.dataset.endDate);
                 const diff = endDate - now;
-                
                 if (diff <= 0) {
                     badge.className = 'time-left-badge expired';
                     badge.innerHTML = '<span>⏰ Ended</span>';
@@ -260,7 +256,6 @@
             });
         }, 1000);
 
-        // Auto-refresh every 5 minutes
         setInterval(() => loadGames(), 300000);
         loadGames();
     </script>
