@@ -37,7 +37,7 @@ class Giveaway:
     def _is_expired(self):
         try:
             if not self.end_date:
-                return False
+                return True
             end = datetime.fromisoformat(self.end_date.replace('Z', '+00:00'))
             now = datetime.now(end.tzinfo) if end.tzinfo else datetime.now()
             return end < now
@@ -78,21 +78,28 @@ async def get_epic(session):
                         if discount == 0:
                             slug = game.get("productSlug", "")
                             ns = game.get("namespace", "")
+                            title = game.get("title", "Unknown")
                             end = offer.get("endDate", "").split("T")[0] if offer.get("endDate") else None
                             price = offer.get("discountSetting", {}).get("originalPrice", 0)
+                            
+                            # Получаем изображение
                             img = next((i.get("url") for i in game.get("keyImages", []) if i.get("type") in ["OfferImageWide", "Thumbnail", "DieselStoreFrontWide"]), None)
                             
+                            # Формируем ПРАВИЛЬНЫЙ URL для store.epicgames.com
+                            url = "https://store.epicgames.com/"
                             if slug:
+                                # Очищаем slug от лишних частей
                                 clean_slug = slug.split('/')[-1] if '/' in slug else slug
-                                url = f"https://store.epicgames.com/en-US/p/{clean_slug}"
+                                # Формат: https://store.epicgames.com/ru/p/game-name-xxx
+                                url = f"https://store.epicgames.com/ru/p/{clean_slug}"
                             elif ns:
-                                url = f"https://store.epicgames.com/en-US/b/{ns}"
-                            else:
-                                url = "https://store.epicgames.com/"
+                                # Если нет slug, пробуем найти игру по названию через поиск
+                                # Или используем namespace как fallback
+                                url = f"https://store.epicgames.com/ru/search?q={title.replace(' ', '%20')}"
                             
                             result.append(Giveaway(
                                 platform="Epic Games",
-                                title=game.get("title", "Unknown"),
+                                title=title,
                                 price=f"${price:.2f}" if price else "N/A",
                                 url=url,
                                 end_date=end,
@@ -107,34 +114,70 @@ async def get_epic(session):
 
 
 async def get_steam(session):
-    """Steam - permanent F2P игры."""
+    """Steam - игры со 100% скидкой (временные раздачи)."""
     result = []
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    
     try:
-        headers = {"User-Agent": "Mozilla/5.0"}
-        async with session.get("https://store.steampowered.com/search/?maxprice=free", headers=headers, timeout=10) as r:
+        # Ищем игры со 100% скидкой (бесплатно временно)
+        async with session.get(
+            "https://store.steampowered.com/search/?maxprice=free&specials=1&l=english",
+            headers=headers,
+            timeout=10
+        ) as r:
             if r.status != 200:
                 return result
             html = await r.text()
             soup = BeautifulSoup(html, 'lxml')
+            
             for game in soup.select('#search_resultsRows .search_result_row')[:20]:
                 title_elem = game.select_one('.title')
                 if not title_elem:
                     continue
+                
+                title = title_elem.get_text(strip=True)
+                
+                # Проверяем наличие 100% скидки
+                discount_elem = game.select_one('.discount_pct')
+                if not discount_elem:
+                    continue
+                
+                discount_text = discount_elem.get_text(strip=True)
+                
+                # Только 100% скидки (бесплатно временно)
+                if discount_text != "100%":
+                    continue
+                
+                # Ссылка
                 link = game.get('href', '')
                 if link and not link.startswith('http'):
                     link = f"https://store.steampowered.com{link}"
+                
+                # Изображение
                 img_elem = game.select_one('img')
+                img_url = img_elem.get('src') if img_elem else None
+                
+                # Дата окончания (Steam не показывает точно, ставим 7 дней)
+                end_date = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d")
+                
+                # Цена
+                price_elem = game.select_one('.discount_original_price')
+                orig_price = price_elem.get_text(strip=True) if price_elem else "N/A"
+                
                 result.append(Giveaway(
                     platform="Steam",
-                    title=title_elem.get_text(strip=True),
-                    price="N/A",
+                    title=title,
+                    price=orig_price,
                     url=link or "https://store.steampowered.com",
-                    image=img_elem.get('src') if img_elem else None,
-                    desc="Free to Play",
-                    is_permanent=True
+                    image=img_url,
+                    desc="100% Off - Limited Time!",
+                    end_date=end_date,
+                    is_permanent=False  # Временная раздача!
                 ))
+                
     except Exception as e:
         print(f"Steam error: {e}")
+    
     return result
 
 
@@ -192,7 +235,7 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(template.encode('utf-8'))
     
     async def _collect_giveaways(self):
-        """Собрать все раздачи."""
+        """Собрать все временные раздачи."""
         async with aiohttp.ClientSession() as session:
             results = await asyncio.gather(get_epic(session), get_steam(session), return_exceptions=True)
             all_games = []
