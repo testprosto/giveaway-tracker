@@ -70,6 +70,7 @@
         footer{text-align:center;padding:30px;color:#444;border-top:1px solid rgba(255,255,255,0.05);margin-top:50px}
         footer a{color:#e94560;text-decoration:none}
         .hidden{display:none!important}
+        .loading{text-align:center;padding:50px;font-size:1.2rem;color:#8892b0}
         @media(max-width:768px){h1{font-size:2rem}.games-grid{grid-template-columns:1fr}.tabs{flex-direction:column}.tab-btn{width:100%;max-width:300px;justify-content:center}}
     </style>
 </head>
@@ -81,72 +82,168 @@
             <div class="stats">
                 <div class="stat-card"><div class="number" id="totalActive">0</div><div class="label">Active</div></div>
                 <div class="stat-card"><div class="number" id="totalExpired">0</div><div class="label">Expired</div></div>
-                <div class="stat-card"><div class="number" id="totalPlatforms">{{total_platforms}}</div><div class="label">Platforms</div></div>
+                <div class="stat-card"><div class="number" id="totalPlatforms">0</div><div class="label">Platforms</div></div>
             </div>
-            <button class="refresh-btn" onclick="refreshData()" id="refreshBtn">🔄 Refresh</button>
+            <button class="refresh-btn" onclick="loadGames()" id="refreshBtn">🔄 Refresh</button>
         </header>
         <div class="tabs">
-            <button class="tab-btn active" data-tab="all" onclick="filterByTab('all')">🎁 All <span class="count" id="count-all">{{total}}</span></button>
+            <button class="tab-btn active" data-tab="all" onclick="filterByTab('all')">🎁 All <span class="count" id="count-all">0</span></button>
             <button class="tab-btn" data-tab="games" onclick="filterByTab('games')">🎮 Games <span class="count" id="count-games">0</span></button>
             <button class="tab-btn" data-tab="dlc" onclick="filterByTab('dlc')">📦 DLCs <span class="count" id="count-dlc">0</span></button>
             <button class="tab-btn expired" data-tab="expired" onclick="filterByTab('expired')">⏰ Expired <span class="count" id="count-expired">0</span></button>
         </div>
-        <div class="platform-filter">
-            <button class="platform-btn active" data-platform="all" onclick="filterByPlatform('all')">All</button>
-            {% for p in platforms %}<button class="platform-btn" data-platform="{{p}}" onclick="filterByPlatform('{{p}}')">{{p}}</button>{% endfor %}
-        </div>
+        <div class="platform-filter" id="platformFilter"></div>
         <main>
-            {% if not giveaways %}
-            <div class="no-games"><div class="no-games-icon">📭</div><h2>No Giveaways</h2><p>Click "Refresh" to check</p></div>
-            {% else %}
-            <div class="games-grid" id="gamesGrid">
-                {% for g in giveaways %}
-                {% set is_dlc='dlc' in g.title.lower() or 'pack' in g.title.lower() %}
-                {% set is_expired=g.is_expired %}
-                <div class="game-card {{'expired' if is_expired else ''}}" data-platform="{{g.platform}}" data-type="{{'dlc' if is_dlc else 'game'}}" data-status="{{'expired' if is_expired else 'active'}}" data-end-date="{{g.end_date or ''}}">
-                    <div class="game-image-container">
-                        {% if g.image_url %}<img src="{{g.image_url}}" alt="{{g.title}}" class="game-image" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="game-image-placeholder" style="display:none">🎮</div>{% else %}<div class="game-image-placeholder">🎮</div>{% endif %}
-                        <span class="platform-badge">{{g.platform}}</span>
-                        <span class="content-type-badge {{'dlc' if is_dlc else 'game'}}">{{'DLC' if is_dlc else 'Game'}}</span>
-                        {% if g.end_date %}
-                        <span class="time-left-badge {{'expired' if is_expired else ('urgent' if g.time_components.days==0 and g.time_components.hours<24 else ('soon' if g.time_components.days==0 else 'normal'))}}" data-end-date="{{g.end_date}}">
-                            <span class="time-display">
-                                {% if not is_expired %}
-                                <span class="time-unit"><span class="time-value days">{{g.time_components.days}}</span><span class="time-label">d</span></span>
-                                <span class="time-unit"><span class="time-value hours">{{g.time_components.hours}}</span><span class="time-label">h</span></span>
-                                <span class="time-unit"><span class="time-value minutes">{{g.time_components.minutes}}</span><span class="time-label">m</span></span>
-                                <span class="time-unit"><span class="time-value seconds">{{g.time_components.seconds}}</span><span class="time-label">s</span></span>
-                                {% else %}<span>⏰ Ended</span>{% endif %}
-                            </span>
-                        </span>
-                        {% else %}
-                        <span class="time-left-badge permanent"><span>♾️ Permanent</span></span>
-                        {% endif %}
-                    </div>
-                    <div class="game-content">
-                        <h3 class="game-title">{{g.title}}</h3>
-                        <div class="game-price"><span class="original-price">{{g.original_price}}</span><span class="free-price">{{g.discount_price}}</span></div>
-                        {% if g.end_date %}<div class="game-end-date">{% if is_expired %}❌ Ended: {{g.end_date}}{% else %}⏰ Ends: {{g.end_date}}{% endif %}</div>{% endif %}
-                        {% if g.description %}<p class="game-description">{{g.description}}</p>{% endif %}
-                        {% if is_expired %}<span class="game-link expired">🚫 Unavailable</span>{% else %}<a href="{{g.url}}" target="_blank" class="game-link">🔗 Get Game</a>{% endif %}
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-            {% endif %}
+            <div id="loading" class="loading">⏳ Loading giveaways...</div>
+            <div class="games-grid" id="gamesGrid" style="display:none"></div>
         </main>
         <footer><p>Giveaway Tracker © 2026 | <a href="/api/giveaways">JSON API</a></p></footer>
     </div>
     <script>
-        let currentTab='all',currentPlatform='all';
-        document.addEventListener('DOMContentLoaded',function(){countItems();startRealTimeUpdates();});
-        function countItems(){const cards=document.querySelectorAll('.game-card');let gc=0,dc=0,ac=0,ec=0;cards.forEach(c=>{if(c.dataset.type==='dlc')dc++;else gc++;if(c.dataset.status==='expired')ec++;else ac++;});document.getElementById('count-games').textContent=gc;document.getElementById('count-dlc').textContent=dc;document.getElementById('count-expired').textContent=ec;document.getElementById('totalActive').textContent=ac;document.getElementById('totalExpired').textContent=ec;}
-        function filterByTab(tab){currentTab=tab;document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));applyFilters();}
-        function filterByPlatform(platform){currentPlatform=platform;document.querySelectorAll('.platform-btn').forEach(b=>b.classList.toggle('active',b.dataset.platform===platform));applyFilters();}
-        function applyFilters(){document.querySelectorAll('.game-card').forEach(c=>{let show=true;if(currentTab==='expired'){if(c.dataset.status!=='expired')show=false;}else if(currentTab!=='all'){if(currentTab==='games'&&c.dataset.type==='dlc')show=false;if(currentTab==='dlc'&&c.dataset.type!=='dlc')show=false;}if(currentPlatform!=='all'&&c.dataset.platform!==currentPlatform)show=false;c.classList.toggle('hidden',!show);});}
-        function startRealTimeUpdates(){setInterval(()=>{const now=new Date();document.querySelectorAll('.time-left-badge[data-end-date]').forEach(badge=>{const endDate=new Date(badge.dataset.endDate);const diff=endDate-now;if(diff<=0){badge.className='time-left-badge expired';badge.innerHTML='<span>⏰ Ended</span>';const card=badge.closest('.game-card');if(card){card.classList.add('expired');card.dataset.status='expired';}countItems();}else{const ts=Math.floor(diff/1000);const d=Math.floor(ts/86400);const h=Math.floor((ts%86400)/3600);const m=Math.floor((ts%3600)/60);const s=ts%60;badge.className='time-left-badge '+(d===0&&h<24?'urgent':h<24?'soon':'normal');badge.innerHTML='<span class="time-display"><span class="time-unit"><span class="time-value days">'+d+'</span><span class="time-label">d</span></span><span class="time-unit"><span class="time-value hours">'+h+'</span><span class="time-label">h</span></span><span class="time-unit"><span class="time-value minutes">'+m+'</span><span class="time-label">m</span></span><span class="time-unit"><span class="time-value seconds">'+s+'</span><span class="time-label">s</span></span></span>';}});},1000);}
-        async function refreshData(){const btn=document.getElementById('refreshBtn');btn.disabled=true;btn.textContent='⏳ Refreshing...';try{const r=await fetch('/api/giveaways?refresh=1');const d=await r.json();if(d.status==='success'){btn.textContent='✅ Updated '+d.count;setTimeout(()=>location.reload(),1000);}else{btn.textContent='❌ Error';btn.disabled=false;}}catch(e){btn.textContent='❌ Error';btn.disabled=false;}}
-        setInterval(()=>refreshData(),600000);
+        let games = [];
+        let platforms = [];
+        let currentTab = 'all';
+        let currentPlatform = 'all';
+
+        async function loadGames() {
+            const btn = document.getElementById('refreshBtn');
+            const loading = document.getElementById('loading');
+            const grid = document.getElementById('gamesGrid');
+            
+            btn.disabled = true;
+            btn.textContent = '⏳ Loading...';
+            loading.style.display = 'block';
+            grid.style.display = 'none';
+            
+            try {
+                const res = await fetch('/api/giveaways');
+                games = await res.json();
+                
+                // Get unique platforms
+                platforms = [...new Set(games.map(g => g.platform))];
+                
+                // Create platform buttons
+                const filterDiv = document.getElementById('platformFilter');
+                filterDiv.innerHTML = '<button class="platform-btn active" data-platform="all" onclick="filterByPlatform(\'all\')">All</button>' +
+                    platforms.map(p => `<button class="platform-btn" data-platform="${p}" onclick="filterByPlatform('${p}')">${p}</button>`).join('');
+                
+                renderGames();
+                countItems();
+                
+                loading.style.display = 'none';
+                grid.style.display = 'grid';
+                btn.textContent = '🔄 Refresh';
+                btn.disabled = false;
+            } catch (e) {
+                loading.innerHTML = '<p>❌ Error loading games. Please try again.</p>';
+                btn.textContent = '🔄 Retry';
+                btn.disabled = false;
+            }
+        }
+
+        function renderGames() {
+            const grid = document.getElementById('gamesGrid');
+            let filtered = games;
+            
+            // Filter by tab
+            if (currentTab === 'expired') {
+                filtered = games.filter(g => g.is_expired);
+            } else if (currentTab === 'games') {
+                filtered = games.filter(g => !g.is_expired && !(g.title.toLowerCase().includes('dlc') || g.title.toLowerCase().includes('pack')));
+            } else if (currentTab === 'dlc') {
+                filtered = games.filter(g => g.title.toLowerCase().includes('dlc') || g.title.toLowerCase().includes('pack'));
+            }
+            
+            // Filter by platform
+            if (currentPlatform !== 'all') {
+                filtered = filtered.filter(g => g.platform === currentPlatform);
+            }
+            
+            grid.innerHTML = filtered.map(g => {
+                const isDlc = g.title.toLowerCase().includes('dlc') || g.title.toLowerCase().includes('pack');
+                const tc = g.time_components || {days:0,hours:0,minutes:0,seconds:0};
+                const timeBadge = g.end_date ? 
+                    `<span class="time-left-badge ${g.is_expired ? 'expired' : (tc.days===0 && tc.hours<24 ? 'urgent' : tc.days===0 ? 'soon' : 'normal')}" data-end-date="${g.end_date}">
+                        <span class="time-display">
+                            ${g.is_expired ? '<span>⏰ Ended</span>' : 
+                                `<span class="time-unit"><span class="time-value days">${tc.days}</span><span class="time-label">d</span></span>
+                                 <span class="time-unit"><span class="time-value hours">${tc.hours}</span><span class="time-label">h</span></span>
+                                 <span class="time-unit"><span class="time-value minutes">${tc.minutes}</span><span class="time-label">m</span></span>
+                                 <span class="time-unit"><span class="time-value seconds">${tc.seconds}</span><span class="time-label">s</span></span>`}
+                        </span>
+                    </span>` : '<span class="time-left-badge permanent"><span>♾️ Permanent</span></span>';
+                
+                return `<div class="game-card ${g.is_expired ? 'expired' : ''}" data-platform="${g.platform}" data-type="${isDlc ? 'dlc' : 'game'}" data-status="${g.is_expired ? 'expired' : 'active'}" data-end-date="${g.end_date || ''}">
+                    <div class="game-image-container">
+                        ${g.image_url ? `<img src="${g.image_url}" alt="${g.title}" class="game-image" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="game-image-placeholder" style="display:none">🎮</div>` : '<div class="game-image-placeholder">🎮</div>'}
+                        <span class="platform-badge">${g.platform}</span>
+                        <span class="content-type-badge ${isDlc ? 'dlc' : 'game'}">${isDlc ? 'DLC' : 'Game'}</span>
+                        ${timeBadge}
+                    </div>
+                    <div class="game-content">
+                        <h3 class="game-title">${g.title}</h3>
+                        <div class="game-price"><span class="original-price">${g.original_price}</span><span class="free-price">${g.discount_price}</span></div>
+                        ${g.end_date ? `<div class="game-end-date">${g.is_expired ? '❌ Ended: '+g.end_date : '⏰ Ends: '+g.end_date}</div>` : ''}
+                        ${g.description ? `<p class="game-description">${g.description}</p>` : ''}
+                        ${g.is_expired ? '<span class="game-link expired">🚫 Unavailable</span>' : `<a href="${g.url}" target="_blank" class="game-link">🔗 Get Game</a>`}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function countItems() {
+            const gc = games.filter(g => !(g.title.toLowerCase().includes('dlc') || g.title.toLowerCase().includes('pack'))).length;
+            const dc = games.filter(g => g.title.toLowerCase().includes('dlc') || g.title.toLowerCase().includes('pack')).length;
+            const ec = games.filter(g => g.is_expired).length;
+            const ac = games.length - ec;
+            
+            document.getElementById('count-games').textContent = gc;
+            document.getElementById('count-dlc').textContent = dc;
+            document.getElementById('count-expired').textContent = ec;
+            document.getElementById('count-all').textContent = games.length;
+            document.getElementById('totalActive').textContent = ac;
+            document.getElementById('totalExpired').textContent = ec;
+            document.getElementById('totalPlatforms').textContent = platforms.length;
+        }
+
+        function filterByTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+            renderGames();
+        }
+
+        function filterByPlatform(platform) {
+            currentPlatform = platform;
+            document.querySelectorAll('.platform-btn').forEach(b => b.classList.toggle('active', b.dataset.platform === platform));
+            renderGames();
+        }
+
+        // Real-time updates
+        setInterval(() => {
+            const now = new Date();
+            document.querySelectorAll('.time-left-badge[data-end-date]').forEach(badge => {
+                const endDate = new Date(badge.dataset.endDate);
+                const diff = endDate - now;
+                if (diff <= 0) {
+                    badge.className = 'time-left-badge expired';
+                    badge.innerHTML = '<span>⏰ Ended</span>';
+                    const card = badge.closest('.game-card');
+                    if (card) { card.classList.add('expired'); card.dataset.status = 'expired'; }
+                    countItems();
+                } else {
+                    const ts = Math.floor(diff / 1000);
+                    const d = Math.floor(ts / 86400), h = Math.floor((ts % 86400) / 3600), m = Math.floor((ts % 3600) / 60), s = ts % 60;
+                    badge.className = 'time-left-badge ' + (d===0 && h<24 ? 'urgent' : h<24 ? 'soon' : 'normal');
+                    badge.innerHTML = `<span class="time-display"><span class="time-unit"><span class="time-value days">${d}</span><span class="time-label">d</span></span><span class="time-unit"><span class="time-value hours">${h}</span><span class="time-label">h</span></span><span class="time-unit"><span class="time-value minutes">${m}</span><span class="time-label">m</span></span><span class="time-unit"><span class="time-value seconds">${s}</span><span class="time-label">s</span></span></span>`;
+                }
+            });
+        }, 1000);
+
+        // Auto-refresh every 10 minutes
+        setInterval(() => loadGames(), 600000);
+        
+        // Load on page load
+        loadGames();
     </script>
 </body>
 </html>
