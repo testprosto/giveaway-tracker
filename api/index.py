@@ -11,7 +11,7 @@ from bs4 import BeautifulSoup
 
 class Giveaway:
     """Модель раздачи."""
-    def __init__(self, platform, title, price, url, end_date, image=None, desc=None):
+    def __init__(self, platform, title, price, url, end_date=None, image=None, desc=None, is_permanent=False):
         self.platform = platform
         self.title = title
         self.original_price = price
@@ -20,8 +20,9 @@ class Giveaway:
         self.end_date = end_date
         self.image_url = image
         self.description = desc
-        self.time_components = self._get_time()
-        self.is_expired = self._is_expired()
+        self.is_permanent = is_permanent
+        self.time_components = self._get_time() if end_date else {'days': 0, 'hours': 0, 'minutes': 0, 'seconds': 0, 'expired': False}
+        self.is_expired = self._is_expired() if end_date else False
 
     def _get_time(self):
         try:
@@ -36,7 +37,7 @@ class Giveaway:
     def _is_expired(self):
         try:
             if not self.end_date:
-                return True
+                return False
             end = datetime.fromisoformat(self.end_date.replace('Z', '+00:00'))
             now = datetime.now(end.tzinfo) if end.tzinfo else datetime.now()
             return end < now
@@ -44,11 +45,23 @@ class Giveaway:
             return True
 
     def to_dict(self):
-        return {'platform': self.platform, 'title': self.title, 'original_price': self.original_price, 'discount_price': self.discount_price, 'url': self.url, 'end_date': self.end_date, 'description': self.description, 'image_url': self.image_url, 'is_expired': self.is_expired, 'time_components': self.time_components}
+        return {
+            'platform': self.platform, 
+            'title': self.title, 
+            'original_price': self.original_price, 
+            'discount_price': self.discount_price, 
+            'url': self.url, 
+            'end_date': self.end_date, 
+            'description': self.description, 
+            'image_url': self.image_url, 
+            'is_expired': self.is_expired, 
+            'time_components': self.time_components,
+            'is_permanent': self.is_permanent
+        }
 
 
 async def get_epic(session):
-    """Epic Games Store - только временные бесплатные игры."""
+    """Epic Games Store - временные бесплатные игры."""
     result = []
     try:
         async with session.get("https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions", timeout=10) as r:
@@ -62,21 +75,13 @@ async def get_epic(session):
                 for og in promos.get("promotionalOffers", []):
                     for offer in og.get("promotionalOffers", []):
                         discount = offer.get("discountSetting", {}).get("discountPercentage", 100)
-                        # Только 100% скидки (бесплатно)
                         if discount == 0:
                             slug = game.get("productSlug", "")
                             ns = game.get("namespace", "")
                             end = offer.get("endDate", "").split("T")[0] if offer.get("endDate") else None
                             price = offer.get("discountSetting", {}).get("originalPrice", 0)
+                            img = next((i.get("url") for i in game.get("keyImages", []) if i.get("type") in ["OfferImageWide", "Thumbnail", "DieselStoreFrontWide"]), None)
                             
-                            # Получаем изображение
-                            img = None
-                            for i in game.get("keyImages", []):
-                                if i.get("type") in ["OfferImageWide", "Thumbnail", "DieselStoreFrontWide"]:
-                                    img = i.get("url")
-                                    break
-                            
-                            # Формируем URL
                             if slug:
                                 clean_slug = slug.split('/')[-1] if '/' in slug else slug
                                 url = f"https://store.epicgames.com/en-US/p/{clean_slug}"
@@ -92,11 +97,44 @@ async def get_epic(session):
                                 url=url,
                                 end_date=end,
                                 image=img,
-                                desc=(game.get("description") or "")[:200]
+                                desc=(game.get("description") or "")[:200],
+                                is_permanent=False
                             ))
                             break
     except Exception as e:
         print(f"Epic error: {e}")
+    return result
+
+
+async def get_steam(session):
+    """Steam - permanent F2P игры."""
+    result = []
+    try:
+        headers = {"User-Agent": "Mozilla/5.0"}
+        async with session.get("https://store.steampowered.com/search/?maxprice=free", headers=headers, timeout=10) as r:
+            if r.status != 200:
+                return result
+            html = await r.text()
+            soup = BeautifulSoup(html, 'lxml')
+            for game in soup.select('#search_resultsRows .search_result_row')[:20]:
+                title_elem = game.select_one('.title')
+                if not title_elem:
+                    continue
+                link = game.get('href', '')
+                if link and not link.startswith('http'):
+                    link = f"https://store.steampowered.com{link}"
+                img_elem = game.select_one('img')
+                result.append(Giveaway(
+                    platform="Steam",
+                    title=title_elem.get_text(strip=True),
+                    price="N/A",
+                    url=link or "https://store.steampowered.com",
+                    image=img_elem.get('src') if img_elem else None,
+                    desc="Free to Play",
+                    is_permanent=True
+                ))
+    except Exception as e:
+        print(f"Steam error: {e}")
     return result
 
 
@@ -110,7 +148,7 @@ def get_template():
             with open(template_path, 'r', encoding='utf-8') as f:
                 HTML_TEMPLATE = f.read()
         except:
-            HTML_TEMPLATE = "<html><body><h1>Error loading template</h1></body></html>"
+            HTML_TEMPLATE = "<html><body><h1>Error</h1></body></html>"
     return HTML_TEMPLATE
 
 
@@ -120,7 +158,6 @@ class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urlparse(self.path)
         path = parsed.path
-        query = parse_qs(parsed.query)
         
         if path == '/api/giveaways':
             self.send_response(200)
@@ -135,9 +172,15 @@ class handler(BaseHTTPRequestHandler):
             self.send_header('Content-Type', 'application/json')
             self.end_headers()
             giveaways = asyncio.run(self._collect_giveaways())
-            stats = {'total': len(giveaways), 'by_platform': {}}
+            stats = {'total': len(giveaways), 'by_platform': {}, 'permanent': 0, 'limited': 0, 'expired': 0}
             for g in giveaways:
-                stats['by_platform'][g.platform] = stats['by_platform'].get(g.platform, 0) + 1
+                stats['by_platform'][g['platform']] = stats['by_platform'].get(g['platform'], 0) + 1
+                if g['is_permanent']:
+                    stats['permanent'] += 1
+                elif g['is_expired']:
+                    stats['expired'] += 1
+                else:
+                    stats['limited'] += 1
             self.wfile.write(json.dumps(stats).encode())
         
         else:
@@ -149,17 +192,17 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(template.encode('utf-8'))
     
     async def _collect_giveaways(self):
-        """Собрать только временные раздачи (Epic Games)."""
+        """Собрать все раздачи."""
         async with aiohttp.ClientSession() as session:
-            results = await asyncio.gather(get_epic(session), return_exceptions=True)
+            results = await asyncio.gather(get_epic(session), get_steam(session), return_exceptions=True)
             all_games = []
             for r in results:
                 if isinstance(r, list):
                     all_games.extend(r)
-            # Удаляем дубликаты и истёкшие
+            # Удаляем дубликаты
             seen, unique = set(), []
             for g in all_games:
-                if g.url not in seen and not g.is_expired:
+                if g.url not in seen:
                     seen.add(g.url)
                     unique.append(g)
             return [g.to_dict() for g in unique]

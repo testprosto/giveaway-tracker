@@ -3,109 +3,138 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Free Games - Epic Giveaways</title>
+    <title>Free Games Tracker</title>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
         body{font-family:'Rajdhani',sans-serif;background:#0a0a0f;color:#fff;min-height:100vh}
-        .container{max-width:1200px;margin:0 auto;padding:20px}
+        .container{max-width:1400px;margin:0 auto;padding:20px}
         header{text-align:center;padding:40px 0;margin-bottom:30px}
         h1{font-family:'Orbitron',sans-serif;font-size:3rem;font-weight:900;background:linear-gradient(135deg,#ff006e,#8338ec,#00d4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:10px}
         header p{color:#8892b0;font-size:1.1rem;letter-spacing:2px}
-        .stats{display:flex;justify-content:center;gap:20px;margin:30px 0}
+        .stats{display:flex;justify-content:center;gap:20px;margin:30px 0;flex-wrap:wrap}
         .stat-card{background:linear-gradient(135deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02));border:1px solid rgba(255,255,255,0.1);padding:20px 35px;border-radius:15px;text-align:center}
         .stat-card .number{font-family:'Orbitron',sans-serif;font-size:2.5rem;font-weight:700;background:linear-gradient(135deg,#00d4ff,#8338ec);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
         .stat-card .label{color:#8892b0;font-size:0.85rem;text-transform:uppercase;letter-spacing:2px;margin-top:5px}
         .refresh-btn{background:linear-gradient(135deg,#e94560,#ff6b6b);color:#fff;border:none;padding:12px 35px;border-radius:50px;cursor:pointer;font-size:1rem;font-weight:600;text-transform:uppercase;letter-spacing:2px;transition:all 0.3s;margin:20px auto;display:block}
         .refresh-btn:hover{transform:translateY(-3px);box-shadow:0 10px 40px rgba(233,69,96,0.5)}
         .refresh-btn:disabled{background:#444;cursor:not-allowed}
-        .games-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(350px,1fr));gap:30px;margin-top:30px}
+        .tabs{display:flex;justify-content:center;gap:10px;margin:30px 0;flex-wrap:wrap}
+        .tab-btn{background:rgba(255,255,255,0.03);color:#8892b0;border:2px solid rgba(255,255,255,0.1);padding:12px 30px;border-radius:50px;cursor:pointer;font-size:0.95rem;font-weight:600;text-transform:uppercase;transition:all 0.3s;display:flex;align-items:center;gap:8px}
+        .tab-btn:hover{background:rgba(255,255,255,0.08);color:#fff;border-color:rgba(233,69,96,0.5)}
+        .tab-btn.active{background:linear-gradient(135deg,#e94560,#ff6b6b);color:#fff;border-color:transparent;box-shadow:0 5px 30px rgba(233,69,96,0.4)}
+        .tab-btn .count{background:rgba(255,255,255,0.2);padding:2px 10px;border-radius:10px;font-size:0.8rem}
+        .tab-btn.expired.active{background:linear-gradient(135deg,#4a4a4a,#666)}
+        .platform-filter{display:flex;justify-content:center;gap:10px;margin:20px 0;flex-wrap:wrap}
+        .platform-btn{background:rgba(255,255,255,0.03);color:#8892b0;border:1px solid rgba(255,255,255,0.1);padding:8px 20px;border-radius:20px;cursor:pointer;font-size:0.85rem;transition:all 0.3s}
+        .platform-btn:hover{background:rgba(255,255,255,0.08);color:#fff;border-color:rgba(233,69,96,0.5)}
+        .platform-btn.active{background:rgba(233,69,96,0.2);color:#fff;border-color:#e94560}
+        .games-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:25px;margin-top:30px}
         .game-card{background:linear-gradient(135deg,rgba(20,20,30,0.9),rgba(10,10,20,0.95));border:1px solid rgba(255,255,255,0.08);border-radius:20px;overflow:hidden;transition:all 0.4s;display:flex;flex-direction:column}
         .game-card:hover{transform:translateY(-10px);border-color:rgba(233,69,96,0.5);box-shadow:0 20px 60px rgba(233,69,96,0.3)}
-        .game-image-container{width:100%;height:200px;background:linear-gradient(135deg,#1a1a2e,#16213e);position:relative;overflow:hidden}
+        .game-card.expired{opacity:0.5;filter:grayscale(0.5)}
+        .game-image-container{width:100%;height:180px;background:linear-gradient(135deg,#1a1a2e,#16213e);position:relative;overflow:hidden}
         .game-image{width:100%;height:100%;object-fit:cover;transition:transform 0.5s}
         .game-card:hover .game-image{transform:scale(1.1)}
         .game-image-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:4rem;color:#e94560}
-        .platform-badge{position:absolute;top:10px;right:10px;padding:5px 12px;border-radius:20px;font-size:0.7rem;font-weight:700;text-transform:uppercase;z-index:10;background:#2d2d2d;color:#fff}
-        .time-left-badge{position:absolute;bottom:10px;left:10px;padding:10px 16px;border-radius:25px;font-size:0.75rem;font-weight:700;z-index:10;background:linear-gradient(135deg,rgba(76,175,80,0.95),rgba(56,142,60,0.95));color:#fff;border:1px solid rgba(255,255,255,0.3)}
-        .time-left-badge.urgent{background:linear-gradient(135deg,rgba(233,69,96,0.95),rgba(255,0,110,0.95));animation:pulse 2s infinite}
-        .time-left-badge.soon{background:linear-gradient(135deg,rgba(255,152,0,0.95),rgba(255,87,34,0.95))}
-        @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
-        .time-display{display:flex;align-items:center;gap:8px}
-        .time-unit{display:flex;flex-direction:column;align-items:center}
-        .time-value{font-weight:900;font-size:0.9rem;font-family:'Orbitron',sans-serif}
-        .time-label{font-size:0.5rem;opacity:0.8;text-transform:uppercase}
-        .game-content{padding:25px;flex:1;display:flex;flex-direction:column}
-        .game-title{font-family:'Orbitron',sans-serif;font-size:1.2rem;font-weight:700;color:#fff;margin-bottom:15px;line-height:1.4}
-        .game-price{display:flex;align-items:center;gap:15px;margin-bottom:15px}
-        .original-price{color:#666;text-decoration:line-through;font-size:1rem}
-        .free-price{color:#4caf50;font-weight:900;font-size:1.5rem;font-family:'Orbitron',sans-serif;text-shadow:0 0 15px rgba(76,175,80,0.6)}
-        .game-end-date{background:rgba(233,69,96,0.2);color:#e94560;padding:8px 15px;border-radius:10px;font-size:0.85rem;font-weight:600;display:inline-block;margin-bottom:15px;border:1px solid rgba(233,69,96,0.4)}
-        .game-description{color:#8892b0;font-size:0.9rem;margin-bottom:20px;line-height:1.6;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;flex:1}
-        .game-link{display:block;background:linear-gradient(135deg,#e94560,#ff6b6b);color:#fff;text-align:center;padding:15px;border-radius:12px;text-decoration:none;font-weight:700;text-transform:uppercase;letter-spacing:2px;transition:all 0.3s}
+        .platform-badge{position:absolute;top:10px;right:10px;padding:5px 12px;border-radius:20px;font-size:0.7rem;font-weight:700;text-transform:uppercase;z-index:10}
+        .platform-badge.steam{background:#1b2838;color:#66c0f4}
+        .platform-badge.epic{background:#2d2d2d;color:#fff}
+        .content-type-badge{position:absolute;top:10px;left:10px;padding:5px 12px;border-radius:20px;font-size:0.65rem;font-weight:700;text-transform:uppercase;z-index:10}
+        .content-type-badge.game{background:rgba(76,175,80,0.9);color:#fff}
+        .content-type-badge.dlc{background:rgba(255,152,0,0.9);color:#fff}
+        .time-left-badge{position:absolute;bottom:10px;right:10px;padding:8px 16px;border-radius:25px;font-size:0.7rem;font-weight:700;z-index:10;border:1px solid rgba(255,255,255,0.2)}
+        .time-left-badge.urgent{background:linear-gradient(135deg,rgba(233,69,96,0.95),rgba(255,0,110,0.95));color:#fff}
+        .time-left-badge.soon{background:linear-gradient(135deg,rgba(255,152,0,0.95),rgba(255,87,34,0.95));color:#fff}
+        .time-left-badge.normal{background:linear-gradient(135deg,rgba(76,175,80,0.95),rgba(56,142,60,0.95));color:#fff}
+        .time-left-badge.expired{background:linear-gradient(135deg,rgba(100,100,100,0.95),rgba(60,60,60,0.95));color:#ccc}
+        .time-left-badge.permanent{background:linear-gradient(135deg,rgba(0,212,255,0.95),rgba(131,56,236,0.95));color:#fff}
+        .time-display{display:flex;align-items:center;gap:5px}
+        .time-unit{display:flex;flex-direction:column;align-items:center;min-width:20px}
+        .time-value{font-weight:900;font-size:0.75rem;font-family:'Orbitron',sans-serif}
+        .time-label{font-size:0.4rem;opacity:0.8;text-transform:uppercase}
+        .game-content{padding:20px;flex:1;display:flex;flex-direction:column}
+        .game-title{font-family:'Orbitron',sans-serif;font-size:1.1rem;font-weight:700;color:#fff;margin-bottom:12px;line-height:1.4}
+        .game-price{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+        .original-price{color:#555;text-decoration:line-through;font-size:0.9rem}
+        .free-price{color:#4caf50;font-weight:900;font-size:1.3rem;font-family:'Orbitron',sans-serif}
+        .game-end-date{background:rgba(233,69,96,0.2);color:#e94560;padding:6px 12px;border-radius:8px;font-size:0.8rem;font-weight:600;display:inline-block;margin-bottom:12px;border:1px solid rgba(233,69,96,0.3)}
+        .game-description{color:#8892b0;font-size:0.85rem;margin-bottom:15px;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;flex:1}
+        .game-link{display:block;background:linear-gradient(135deg,#e94560,#ff6b6b);color:#fff;text-align:center;padding:12px;border-radius:10px;text-decoration:none;font-weight:700;text-transform:uppercase;letter-spacing:2px;transition:all 0.3s}
         .game-link:hover{box-shadow:0 10px 40px rgba(233,69,96,0.5);transform:translateY(-2px)}
+        .game-link.expired{background:#444;cursor:not-allowed}
         .no-games{text-align:center;padding:80px 20px;color:#666}
-        .no-games-icon{font-size:5rem;margin-bottom:20px;opacity:0.5}
         .loading{text-align:center;padding:50px;font-size:1.2rem;color:#8892b0}
         footer{text-align:center;padding:30px;color:#444;border-top:1px solid rgba(255,255,255,0.05);margin-top:50px}
-        @media(max-width:768px){h1{font-size:2rem}.games-grid{grid-template-columns:1fr}.stat-card{min-width:100px}}
+        .hidden{display:none!important}
+        @media(max-width:768px){h1{font-size:2rem}.games-grid{grid-template-columns:1fr}.tabs{flex-direction:column}.tab-btn{width:100%;max-width:300px;justify-content:center}}
     </style>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>🎮 FREE GAMES NOW</h1>
-            <p>Limited-time free games from Epic Games Store</p>
+            <h1>🎮 FREE GAMES TRACKER</h1>
+            <p>Track free games from Epic Games Store & Steam</p>
             <div class="stats">
-                <div class="stat-card"><div class="number" id="totalGames">0</div><div class="label">Free Games</div></div>
-                <div class="stat-card"><div class="number" id="endingSoon">0</div><div class="label">Ending Soon</div></div>
+                <div class="stat-card"><div class="number" id="statActive">0</div><div class="label">Active</div></div>
+                <div class="stat-card"><div class="number" id="statPermanent">0</div><div class="label">Permanent</div></div>
+                <div class="stat-card"><div class="number" id="statExpired">0</div><div class="label">Expired</div></div>
             </div>
             <button class="refresh-btn" onclick="loadGames()" id="refreshBtn">🔄 Refresh</button>
         </header>
+        
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="all" onclick="filterByTab('all')">🎁 All <span class="count" id="count-all">0</span></button>
+            <button class="tab-btn" data-tab="games" onclick="filterByTab('games')">🎮 Games <span class="count" id="count-games">0</span></button>
+            <button class="tab-btn" data-tab="dlc" onclick="filterByTab('dlc')">📦 DLCs <span class="count" id="count-dlc">0</span></button>
+            <button class="tab-btn expired" data-tab="expired" onclick="filterByTab('expired')">⏰ Expired <span class="count" id="count-expired">0</span></button>
+        </div>
+        
+        <div class="platform-filter" id="platformFilter"></div>
+        
         <main>
-            <div id="loading" class="loading">⏳ Loading free games...</div>
+            <div id="loading" class="loading">⏳ Loading giveaways...</div>
             <div class="games-grid" id="gamesGrid" style="display:none"></div>
-            <div id="noGames" class="no-games" style="display:none">
-                <div class="no-games-icon">📭</div>
-                <h2>No Free Games Right Now</h2>
-                <p>Check back later for new giveaways!</p>
-            </div>
         </main>
-        <footer><p>Updates every 5 minutes | Data from Epic Games Store API</p></footer>
+        
+        <footer><p>Updates every 5 minutes | Epic Games & Steam</p></footer>
     </div>
+    
     <script>
         let games = [];
+        let platforms = [];
+        let currentTab = 'all';
+        let currentPlatform = 'all';
 
         async function loadGames() {
             const btn = document.getElementById('refreshBtn');
             const loading = document.getElementById('loading');
             const grid = document.getElementById('gamesGrid');
-            const noGames = document.getElementById('noGames');
             
             btn.disabled = true;
             btn.textContent = '⏳ Loading...';
             loading.style.display = 'block';
             grid.style.display = 'none';
-            noGames.style.display = 'none';
             
             try {
                 const res = await fetch('/api/giveaways');
                 games = await res.json();
+                platforms = [...new Set(games.map(g => g.platform))];
                 
-                if (games.length === 0) {
-                    loading.style.display = 'none';
-                    noGames.style.display = 'block';
-                } else {
-                    renderGames();
-                    updateStats();
-                    loading.style.display = 'none';
-                    grid.style.display = 'grid';
-                }
+                // Platform filter buttons
+                document.getElementById('platformFilter').innerHTML = 
+                    '<button class="platform-btn active" data-platform="all" onclick="filterByPlatform(\'all\')">All</button>' +
+                    platforms.map(p => `<button class="platform-btn" data-platform="${p}" onclick="filterByPlatform('${p}')">${p}</button>`).join('');
                 
+                renderGames();
+                updateStats();
+                
+                loading.style.display = 'none';
+                grid.style.display = 'grid';
                 btn.textContent = '🔄 Refresh';
                 btn.disabled = false;
             } catch (e) {
-                loading.innerHTML = '<p>❌ Error loading games. Please refresh.</p>';
+                loading.innerHTML = '<p>❌ Error loading games.</p>';
                 btn.textContent = '🔄 Retry';
                 btn.disabled = false;
             }
@@ -113,49 +142,99 @@
 
         function renderGames() {
             const grid = document.getElementById('gamesGrid');
+            let filtered = games;
             
-            grid.innerHTML = games.map(g => {
+            // Filter by tab
+            if (currentTab === 'expired') {
+                filtered = games.filter(g => g.is_expired);
+            } else if (currentTab === 'games') {
+                filtered = games.filter(g => !g.is_expired && !isDlc(g.title));
+            } else if (currentTab === 'dlc') {
+                filtered = games.filter(g => isDlc(g.title));
+            }
+            
+            // Filter by platform
+            if (currentPlatform !== 'all') {
+                filtered = filtered.filter(g => g.platform === currentPlatform);
+            }
+            
+            grid.innerHTML = filtered.map(g => {
                 const tc = g.time_components || {days:0,hours:0,minutes:0,seconds:0};
-                const isUrgent = tc.days === 0 && tc.hours < 24;
-                const isSoon = tc.days === 0 && tc.hours >= 24;
+                const isDlcGame = isDlc(g.title);
                 
-                return `<div class="game-card">
+                // Time badge
+                let timeBadge;
+                if (g.is_permanent) {
+                    timeBadge = '<span class="time-left-badge permanent"><span>♾️ Permanent</span></span>';
+                } else if (g.end_date) {
+                    const badgeClass = g.is_expired ? 'expired' : (tc.days===0 && tc.hours<24 ? 'urgent' : tc.days===0 ? 'soon' : 'normal');
+                    timeBadge = `<span class="time-left-badge ${badgeClass}" data-end-date="${g.end_date}">
+                        <span class="time-display">
+                            ${g.is_expired ? '<span>⏰ Ended</span>' : 
+                                `<span class="time-unit"><span class="time-value days">${tc.days}</span><span class="time-label">d</span></span>
+                                 <span class="time-unit"><span class="time-value hours">${tc.hours}</span><span class="time-label">h</span></span>
+                                 <span class="time-unit"><span class="time-value minutes">${tc.minutes}</span><span class="time-label">m</span></span>
+                                 <span class="time-unit"><span class="time-value seconds">${tc.seconds}</span><span class="time-label">s</span></span>`}
+                        </span>
+                    </span>`;
+                }
+                
+                return `<div class="game-card ${g.is_expired ? 'expired' : ''}" data-platform="${g.platform}" data-type="${isDlcGame ? 'dlc' : 'game'}" data-status="${g.is_expired ? 'expired' : 'active'}">
                     <div class="game-image-container">
                         ${g.image_url ? `<img src="${g.image_url}" alt="${g.title}" class="game-image" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="game-image-placeholder" style="display:none">🎮</div>` : '<div class="game-image-placeholder">🎮</div>'}
-                        <span class="platform-badge">${g.platform}</span>
-                        <span class="time-left-badge ${isUrgent ? 'urgent' : isSoon ? 'soon' : ''}" data-end-date="${g.end_date}">
-                            <span class="time-display">
-                                <span class="time-unit"><span class="time-value days">${tc.days}</span><span class="time-label">Days</span></span>
-                                <span class="time-unit"><span class="time-value hours">${tc.hours}</span><span class="time-label">Hours</span></span>
-                                <span class="time-unit"><span class="time-value minutes">${tc.minutes}</span><span class="time-label">Min</span></span>
-                                <span class="time-unit"><span class="time-value seconds">${tc.seconds}</span><span class="time-label">Sec</span></span>
-                            </span>
-                        </span>
+                        <span class="platform-badge ${g.platform.toLowerCase()}">${g.platform}</span>
+                        <span class="content-type-badge ${isDlcGame ? 'dlc' : 'game'}">${isDlcGame ? 'DLC' : 'Game'}</span>
+                        ${timeBadge}
                     </div>
                     <div class="game-content">
                         <h3 class="game-title">${g.title}</h3>
-                        <div class="game-price">
-                            <span class="original-price">${g.original_price}</span>
-                            <span class="free-price">FREE</span>
-                        </div>
-                        <div class="game-end-date">⏰ Ends: ${g.end_date}</div>
+                        <div class="game-price"><span class="original-price">${g.original_price}</span><span class="free-price">FREE</span></div>
+                        ${g.end_date && !g.is_permanent ? `<div class="game-end-date">${g.is_expired ? '❌ Ended: '+g.end_date : '⏰ Ends: '+g.end_date}</div>` : ''}
                         ${g.description ? `<p class="game-description">${g.description}</p>` : ''}
-                        <a href="${g.url}" target="_blank" class="game-link">🔗 Claim Now</a>
+                        ${g.is_expired ? '<span class="game-link expired">🚫 Unavailable</span>' : `<a href="${g.url}" target="_blank" class="game-link">🔗 Get Game</a>`}
                     </div>
                 </div>`;
             }).join('');
         }
 
-        function updateStats() {
-            document.getElementById('totalGames').textContent = games.length;
-            const endingSoon = games.filter(g => {
-                const tc = g.time_components;
-                return tc && tc.days === 0 && tc.hours < 48;
-            }).length;
-            document.getElementById('endingSoon').textContent = endingSoon;
+        function isDlc(title) {
+            const t = title.toLowerCase();
+            return t.includes('dlc') || t.includes('pack') || t.includes('edition') || t.includes('artbook') || t.includes('soundtrack');
         }
 
-        // Real-time countdown updates
+        function updateStats() {
+            const active = games.filter(g => !g.is_expired && !g.is_permanent).length;
+            const permanent = games.filter(g => g.is_permanent).length;
+            const expired = games.filter(g => g.is_expired).length;
+            
+            document.getElementById('statActive').textContent = active;
+            document.getElementById('statPermanent').textContent = permanent;
+            document.getElementById('statExpired').textContent = expired;
+            
+            // Tab counts
+            const allGames = games.length;
+            const onlyGames = games.filter(g => !isDlc(g.title)).length;
+            const onlyDlcs = games.filter(g => isDlc(g.title)).length;
+            
+            document.getElementById('count-all').textContent = allGames;
+            document.getElementById('count-games').textContent = onlyGames;
+            document.getElementById('count-dlc').textContent = onlyDlcs;
+            document.getElementById('count-expired').textContent = expired;
+        }
+
+        function filterByTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+            renderGames();
+        }
+
+        function filterByPlatform(platform) {
+            currentPlatform = platform;
+            document.querySelectorAll('.platform-btn').forEach(b => b.classList.toggle('active', b.dataset.platform === platform));
+            renderGames();
+        }
+
+        // Real-time countdown
         setInterval(() => {
             const now = new Date();
             document.querySelectorAll('.time-left-badge[data-end-date]').forEach(badge => {
@@ -163,24 +242,20 @@
                 const diff = endDate - now;
                 
                 if (diff <= 0) {
-                    badge.innerHTML = '<span>⏰ Ended!</span>';
-                    badge.closest('.game-card').style.opacity = '0.5';
+                    badge.className = 'time-left-badge expired';
+                    badge.innerHTML = '<span>⏰ Ended</span>';
+                    const card = badge.closest('.game-card');
+                    if (card) { card.classList.add('expired'); card.dataset.status = 'expired'; }
+                    updateStats();
                 } else {
                     const ts = Math.floor(diff / 1000);
-                    const d = Math.floor(ts / 86400);
-                    const h = Math.floor((ts % 86400) / 3600);
-                    const m = Math.floor((ts % 3600) / 60);
-                    const s = ts % 60;
-                    
-                    const isUrgent = d === 0 && h < 24;
-                    const isSoon = d === 0 && h >= 24;
-                    
-                    badge.className = 'time-left-badge ' + (isUrgent ? 'urgent' : isSoon ? 'soon' : '');
+                    const d = Math.floor(ts / 86400), h = Math.floor((ts % 86400) / 3600), m = Math.floor((ts % 3600) / 60), s = ts % 60;
+                    badge.className = 'time-left-badge ' + (d===0 && h<24 ? 'urgent' : h<24 ? 'soon' : 'normal');
                     badge.innerHTML = `<span class="time-display">
-                        <span class="time-unit"><span class="time-value days">${d}</span><span class="time-label">Days</span></span>
-                        <span class="time-unit"><span class="time-value hours">${h}</span><span class="time-label">Hours</span></span>
-                        <span class="time-unit"><span class="time-value minutes">${m}</span><span class="time-label">Min</span></span>
-                        <span class="time-unit"><span class="time-value seconds">${s}</span><span class="time-label">Sec</span></span>
+                        <span class="time-unit"><span class="time-value days">${d}</span><span class="time-label">d</span></span>
+                        <span class="time-unit"><span class="time-value hours">${h}</span><span class="time-label">h</span></span>
+                        <span class="time-unit"><span class="time-value minutes">${m}</span><span class="time-label">m</span></span>
+                        <span class="time-unit"><span class="time-value seconds">${s}</span><span class="time-label">s</span></span>
                     </span>`;
                 }
             });
@@ -188,8 +263,6 @@
 
         // Auto-refresh every 5 minutes
         setInterval(() => loadGames(), 300000);
-        
-        // Load on page load
         loadGames();
     </script>
 </body>
