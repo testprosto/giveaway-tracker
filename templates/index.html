@@ -1,1210 +1,263 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Free Games Tracker</title>
-
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
-
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Rajdhani', sans-serif;
-            background: #0a0a0f;
-            color: #fff;
-            min-height: 100vh;
-        }
-
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-
-        header {
-            text-align: center;
-            padding: 40px 0;
-            margin-bottom: 30px;
-        }
-
-        h1 {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 3rem;
-            font-weight: 900;
-            background: linear-gradient(135deg, #ff006e, #8338ec, #00d4ff);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 10px;
-        }
-
-        header p {
-            color: #8892b0;
-            font-size: 1.1rem;
-            letter-spacing: 2px;
-        }
-
-        .stats {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            margin: 30px 0;
-            flex-wrap: wrap;
-        }
-
-        .stat-card {
-            background: linear-gradient(135deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
-            border: 1px solid rgba(255,255,255,.1);
-            padding: 20px 35px;
-            border-radius: 15px;
-            text-align: center;
-        }
-
-        .stat-card .number {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 2.5rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, #00d4ff, #8338ec);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .stat-card .label {
-            color: #8892b0;
-            font-size: .85rem;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            margin-top: 5px;
-        }
-
-        .refresh-btn {
-            background: linear-gradient(135deg, #e94560, #ff6b6b);
-            color: #fff;
-            border: none;
-            padding: 12px 35px;
-            border-radius: 50px;
-            cursor: pointer;
-            font-size: 1rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            transition: all .3s;
-            margin: 20px auto;
-            display: block;
-        }
-
-        .refresh-btn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 40px rgba(233,69,96,.5);
-        }
-
-        .refresh-btn:disabled {
-            background: #444;
-            cursor: not-allowed;
-        }
-
-        .tabs {
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            margin: 30px 0;
-            flex-wrap: wrap;
-        }
-
-        .tab-btn {
-            background: rgba(255,255,255,.03);
-            color: #8892b0;
-            border: 2px solid rgba(255,255,255,.1);
-            padding: 12px 30px;
-            border-radius: 50px;
-            cursor: pointer;
-            font-size: .95rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            transition: all .3s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .tab-btn:hover {
-            background: rgba(255,255,255,.08);
-            color: #fff;
-            border-color: rgba(233,69,96,.5);
-        }
-
-        .tab-btn.active {
-            background: linear-gradient(135deg, #e94560, #ff6b6b);
-            color: #fff;
-            border-color: transparent;
-            box-shadow: 0 5px 30px rgba(233,69,96,.4);
-        }
-
-        .tab-btn .count {
-            background: rgba(255,255,255,.2);
-            padding: 2px 10px;
-            border-radius: 10px;
-            font-size: .8rem;
-        }
-
-        .tab-btn.expired.active {
-            background: linear-gradient(135deg, #4a4a4a, #666);
-        }
-
-        .platform-filter {
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            margin: 20px 0;
-            flex-wrap: wrap;
-        }
-
-        .platform-btn {
-            background: rgba(255,255,255,.03);
-            color: #8892b0;
-            border: 1px solid rgba(255,255,255,.1);
-            padding: 8px 20px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: .85rem;
-            transition: all .3s;
-        }
-
-        .platform-btn:hover {
-            background: rgba(255,255,255,.08);
-            color: #fff;
-            border-color: rgba(233,69,96,.5);
-        }
-
-        .platform-btn.active {
-            background: rgba(233,69,96,.2);
-            color: #fff;
-            border-color: #e94560;
-        }
-
-        .games-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-            gap: 25px;
-            margin-top: 30px;
-        }
-
-        .game-card {
-            background: linear-gradient(135deg, rgba(20,20,30,.9), rgba(10,10,20,.95));
-            border: 1px solid rgba(255,255,255,.08);
-            border-radius: 20px;
-            overflow: hidden;
-            transition: all .4s;
-            display: flex;
-            flex-direction: column;
-            min-width: 0;
-        }
-
-        .game-card:hover {
-            transform: translateY(-6px);
-            border-color: rgba(233,69,96,.5);
-            box-shadow: 0 20px 60px rgba(233,69,96,.2);
-        }
-
-        .game-card.expired {
-            opacity: .5;
-            filter: grayscale(.5);
-        }
-
-        .game-image-container {
-            width: 100%;
-            height: 200px;
-            background: linear-gradient(135deg, #1a1a2e, #16213e);
-            position: relative;
-            overflow: hidden;
-        }
-
-        /* Gallery */
-
-        .game-gallery {
-            position: absolute;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background: #10101a;
-        }
-
-        .gallery-main-image {
-            display: block;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            transition: opacity .2s;
-        }
-
-        .game-image-placeholder {
-            width: 100%;
-            height: 100%;
-            align-items: center;
-            justify-content: center;
-            font-size: 4rem;
-            color: #e94560;
-        }
-
-        .gallery-arrow {
-            position: absolute;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 38px;
-            height: 48px;
-            border: 1px solid rgba(255,255,255,.25);
-            border-radius: 10px;
-            background: rgba(0,0,0,.7);
-            color: #fff;
-            font-size: 30px;
-            line-height: 1;
-            cursor: pointer;
-            z-index: 12;
-            opacity: 0;
-            transition: opacity .2s, background .2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .game-gallery:hover .gallery-arrow,
-        .game-gallery:focus-within .gallery-arrow {
-            opacity: 1;
-        }
-
-        .gallery-arrow:hover {
-            background: #e94560;
-        }
-
-        .gallery-arrow.prev {
-            left: 10px;
-        }
-
-        .gallery-arrow.next {
-            right: 10px;
-        }
-
-        .gallery-counter {
-            position: absolute;
-            bottom: 10px;
-            left: 10px;
-            padding: 5px 9px;
-            border-radius: 8px;
-            background: rgba(0,0,0,.75);
-            color: #fff;
-            font-size: .8rem;
-            z-index: 11;
-            pointer-events: none;
-        }
-
-        .gallery-dots {
-            position: absolute;
-            bottom: 16px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 7px;
-            max-width: 45%;
-            overflow: hidden;
-            z-index: 11;
-        }
-
-        .gallery-dot {
-            width: 7px;
-            height: 7px;
-            padding: 0;
-            border: none;
-            border-radius: 50%;
-            background: rgba(255,255,255,.55);
-            cursor: pointer;
-            flex-shrink: 0;
-        }
-
-        .gallery-dot.active {
-            background: #ff386c;
-            transform: scale(1.35);
-        }
-
-        .gallery-arrow:focus-visible,
-        .gallery-dot:focus-visible {
-            outline: 2px solid #00d4ff;
-            outline-offset: 3px;
-        }
-
-        .platform-badge {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: .7rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            z-index: 15;
-        }
-
-        .platform-badge.steam {
-            background: #1b2838;
-            color: #66c0f4;
-        }
-
-        .platform-badge.epic {
-            background: #2d2d2d;
-            color: #fff;
-        }
-
-        .content-type-badge {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: .65rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            z-index: 15;
-        }
-
-        .content-type-badge.game {
-            background: rgba(76,175,80,.9);
-            color: #fff;
-        }
-
-        .content-type-badge.dlc {
-            background: rgba(255,152,0,.9);
-            color: #fff;
-        }
-
-        .time-left-badge {
-            position: absolute;
-            bottom: 10px;
-            right: 10px;
-            padding: 8px 16px;
-            border-radius: 25px;
-            font-size: .7rem;
-            font-weight: 700;
-            z-index: 15;
-            border: 1px solid rgba(255,255,255,.2);
-        }
-
-        .time-left-badge.urgent {
-            background: linear-gradient(135deg, rgba(233,69,96,.95), rgba(255,0,110,.95));
-            color: #fff;
-        }
-
-        .time-left-badge.soon {
-            background: linear-gradient(135deg, rgba(255,152,0,.95), rgba(255,87,34,.95));
-            color: #fff;
-        }
-
-        .time-left-badge.normal {
-            background: linear-gradient(135deg, rgba(76,175,80,.95), rgba(56,142,60,.95));
-            color: #fff;
-        }
-
-        .time-left-badge.expired {
-            background: linear-gradient(135deg, rgba(100,100,100,.95), rgba(60,60,60,.95));
-            color: #ccc;
-        }
-
-        .time-left-badge.permanent {
-            background: linear-gradient(135deg, rgba(0,212,255,.95), rgba(131,56,236,.95));
-            color: #fff;
-        }
-
-        .time-display {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .time-unit {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-width: 20px;
-        }
-
-        .time-value {
-            font-weight: 900;
-            font-size: .75rem;
-            font-family: 'Orbitron', sans-serif;
-        }
-
-        .time-label {
-            font-size: .4rem;
-            opacity: .8;
-            text-transform: uppercase;
-        }
-
-        .game-content {
-            padding: 20px;
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .game-title {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: #fff;
-            margin-bottom: 12px;
-            line-height: 1.4;
-            overflow-wrap: anywhere;
-        }
-
-        .game-price {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 12px;
-        }
-
-        .original-price {
-            color: #777;
-            text-decoration: line-through;
-            font-size: .9rem;
-        }
-
-        .free-price {
-            color: #4caf50;
-            font-weight: 900;
-            font-size: 1.3rem;
-            font-family: 'Orbitron', sans-serif;
-        }
-
-        .game-end-date {
-            background: rgba(233,69,96,.2);
-            color: #e94560;
-            padding: 6px 12px;
-            border-radius: 8px;
-            font-size: .8rem;
-            font-weight: 600;
-            display: inline-block;
-            margin-bottom: 12px;
-            border: 1px solid rgba(233,69,96,.3);
-        }
-
-        .game-description {
-            color: #8892b0;
-            font-size: .85rem;
-            margin-bottom: 15px;
-            line-height: 1.5;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-            flex: 1;
-        }
-
-        .game-link {
-            display: block;
-            background: linear-gradient(135deg, #e94560, #ff6b6b);
-            color: #fff;
-            text-align: center;
-            padding: 12px;
-            border-radius: 10px;
-            text-decoration: none;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            transition: all .3s;
-            margin-top: auto;
-        }
-
-        .game-link:hover {
-            box-shadow: 0 10px 40px rgba(233,69,96,.5);
-            transform: translateY(-2px);
-        }
-
-        .game-link.expired {
-            background: #444;
-            cursor: not-allowed;
-        }
-
-        .no-games {
-            text-align: center;
-            padding: 80px 20px;
-            color: #666;
-        }
-
-        .loading {
-            text-align: center;
-            padding: 50px;
-            font-size: 1.2rem;
-            color: #8892b0;
-        }
-
-        footer {
-            text-align: center;
-            padding: 30px;
-            color: #444;
-            border-top: 1px solid rgba(255,255,255,.05);
-            margin-top: 50px;
-        }
-
-        .hidden {
-            display: none !important;
-        }
-
-        @media (hover: none) {
-            .gallery-arrow {
-                opacity: .9;
-            }
-        }
-
-        @media (max-width: 768px) {
-            h1 {
-                font-size: 2rem;
-            }
-
-            .games-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .tabs {
-                flex-direction: column;
-                align-items: center;
-            }
-
-            .tab-btn {
-                width: 100%;
-                max-width: 300px;
-                justify-content: center;
-            }
-
-            .game-image-container {
-                height: 210px;
-            }
-
-            .gallery-arrow {
-                opacity: .9;
-            }
-        }
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Rajdhani',sans-serif;background:#0a0a0f;color:#fff;min-height:100vh}
+        .container{max-width:1400px;margin:0 auto;padding:20px}
+        header{text-align:center;padding:40px 0;margin-bottom:30px}
+        h1{font-family:'Orbitron',sans-serif;font-size:3rem;font-weight:900;background:linear-gradient(135deg,#ff006e,#8338ec,#00d4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:10px}
+        header p{color:#8892b0;font-size:1.1rem;letter-spacing:2px}
+        .stats{display:flex;justify-content:center;gap:20px;margin:30px 0;flex-wrap:wrap}
+        .stat-card{background:linear-gradient(135deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02));border:1px solid rgba(255,255,255,0.1);padding:20px 35px;border-radius:15px;text-align:center}
+        .stat-card .number{font-family:'Orbitron',sans-serif;font-size:2.5rem;font-weight:700;background:linear-gradient(135deg,#00d4ff,#8338ec);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+        .stat-card .label{color:#8892b0;font-size:0.85rem;text-transform:uppercase;letter-spacing:2px;margin-top:5px}
+        .refresh-btn{background:linear-gradient(135deg,#e94560,#ff6b6b);color:#fff;border:none;padding:12px 35px;border-radius:50px;cursor:pointer;font-size:1rem;font-weight:600;text-transform:uppercase;letter-spacing:2px;transition:all 0.3s;margin:20px auto;display:block}
+        .refresh-btn:hover{transform:translateY(-3px);box-shadow:0 10px 40px rgba(233,69,96,0.5)}
+        .refresh-btn:disabled{background:#444;cursor:not-allowed}
+        .tabs{display:flex;justify-content:center;gap:10px;margin:30px 0;flex-wrap:wrap}
+        .tab-btn{background:rgba(255,255,255,0.03);color:#8892b0;border:2px solid rgba(255,255,255,0.1);padding:12px 30px;border-radius:50px;cursor:pointer;font-size:0.95rem;font-weight:600;text-transform:uppercase;transition:all 0.3s;display:flex;align-items:center;gap:8px}
+        .tab-btn:hover{background:rgba(255,255,255,0.08);color:#fff;border-color:rgba(233,69,96,0.5)}
+        .tab-btn.active{background:linear-gradient(135deg,#e94560,#ff6b6b);color:#fff;border-color:transparent;box-shadow:0 5px 30px rgba(233,69,96,0.4)}
+        .tab-btn .count{background:rgba(255,255,255,0.2);padding:2px 10px;border-radius:10px;font-size:0.8rem}
+        .tab-btn.expired.active{background:linear-gradient(135deg,#4a4a4a,#666)}
+        .platform-filter{display:flex;justify-content:center;gap:10px;margin:20px 0;flex-wrap:wrap}
+        .platform-btn{background:rgba(255,255,255,0.03);color:#8892b0;border:1px solid rgba(255,255,255,0.1);padding:8px 20px;border-radius:20px;cursor:pointer;font-size:0.85rem;transition:all 0.3s}
+        .platform-btn:hover{background:rgba(255,255,255,0.08);color:#fff;border-color:rgba(233,69,96,0.5)}
+        .platform-btn.active{background:rgba(233,69,96,0.2);color:#fff;border-color:#e94560}
+        .games-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:25px;margin-top:30px}
+        .game-card{background:linear-gradient(135deg,rgba(20,20,30,0.9),rgba(10,10,20,0.95));border:1px solid rgba(255,255,255,0.08);border-radius:20px;overflow:hidden;transition:all 0.4s;display:flex;flex-direction:column}
+        .game-card:hover{transform:translateY(-10px);border-color:rgba(233,69,96,0.5);box-shadow:0 20px 60px rgba(233,69,96,0.3)}
+        .game-card.expired{opacity:0.5;filter:grayscale(0.5)}
+        .game-image-container{width:100%;height:180px;background:linear-gradient(135deg,#1a1a2e,#16213e);position:relative;overflow:hidden}
+        .game-image{width:100%;height:100%;object-fit:cover;transition:transform 0.5s}
+        .game-card:hover .game-image{transform:scale(1.1)}
+        .game-image-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:4rem;color:#e94560}
+        .platform-badge{position:absolute;top:10px;right:10px;padding:5px 12px;border-radius:20px;font-size:0.7rem;font-weight:700;text-transform:uppercase;z-index:10}
+        .platform-badge.steam{background:#1b2838;color:#66c0f4}
+        .platform-badge.epic{background:#2d2d2d;color:#fff}
+        .content-type-badge{position:absolute;top:10px;left:10px;padding:5px 12px;border-radius:20px;font-size:0.65rem;font-weight:700;text-transform:uppercase;z-index:10}
+        .content-type-badge.game{background:rgba(76,175,80,0.9);color:#fff}
+        .content-type-badge.dlc{background:rgba(255,152,0,0.9);color:#fff}
+        .time-left-badge{position:absolute;bottom:10px;right:10px;padding:8px 16px;border-radius:25px;font-size:0.7rem;font-weight:700;z-index:10;border:1px solid rgba(255,255,255,0.2)}
+        .time-left-badge.urgent{background:linear-gradient(135deg,rgba(233,69,96,0.95),rgba(255,0,110,0.95));color:#fff}
+        .time-left-badge.soon{background:linear-gradient(135deg,rgba(255,152,0,0.95),rgba(255,87,34,0.95));color:#fff}
+        .time-left-badge.normal{background:linear-gradient(135deg,rgba(76,175,80,0.95),rgba(56,142,60,0.95));color:#fff}
+        .time-left-badge.expired{background:linear-gradient(135deg,rgba(100,100,100,0.95),rgba(60,60,60,0.95));color:#ccc}
+        .time-left-badge.permanent{background:linear-gradient(135deg,rgba(0,212,255,0.95),rgba(131,56,236,0.95));color:#fff}
+        .time-display{display:flex;align-items:center;gap:5px}
+        .time-unit{display:flex;flex-direction:column;align-items:center;min-width:20px}
+        .time-value{font-weight:900;font-size:0.75rem;font-family:'Orbitron',sans-serif}
+        .time-label{font-size:0.4rem;opacity:0.8;text-transform:uppercase}
+        .game-content{padding:20px;flex:1;display:flex;flex-direction:column}
+        .game-title{font-family:'Orbitron',sans-serif;font-size:1.1rem;font-weight:700;color:#fff;margin-bottom:12px;line-height:1.4}
+        .game-price{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+        .original-price{color:#555;text-decoration:line-through;font-size:0.9rem}
+        .free-price{color:#4caf50;font-weight:900;font-size:1.3rem;font-family:'Orbitron',sans-serif}
+        .game-end-date{background:rgba(233,69,96,0.2);color:#e94560;padding:6px 12px;border-radius:8px;font-size:0.8rem;font-weight:600;display:inline-block;margin-bottom:12px;border:1px solid rgba(233,69,96,0.3)}
+        .game-description{color:#8892b0;font-size:0.85rem;margin-bottom:15px;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;flex:1}
+        .game-link{display:block;background:linear-gradient(135deg,#e94560,#ff6b6b);color:#fff;text-align:center;padding:12px;border-radius:10px;text-decoration:none;font-weight:700;text-transform:uppercase;letter-spacing:2px;transition:all 0.3s}
+        .game-link:hover{box-shadow:0 10px 40px rgba(233,69,96,0.5);transform:translateY(-2px)}
+        .game-link.expired{background:#444;cursor:not-allowed}
+        .no-games{text-align:center;padding:80px 20px;color:#666}
+        .loading{text-align:center;padding:50px;font-size:1.2rem;color:#8892b0}
+        footer{text-align:center;padding:30px;color:#444;border-top:1px solid rgba(255,255,255,0.05);margin-top:50px}
+        .hidden{display:none!important}
+        @media(max-width:768px){h1{font-size:2rem}.games-grid{grid-template-columns:1fr}.tabs{flex-direction:column}.tab-btn{width:100%;max-width:300px;justify-content:center}}
     </style>
 </head>
-
 <body>
-<div class="container">
-    <header>
-        <h1>🎮 FREE GAMES TRACKER</h1>
-        <p>Free games from Epic Games &amp; Steam</p>
-
-        <div class="stats">
-            <div class="stat-card">
-                <div class="number" id="statActive">0</div>
-                <div class="label">Active</div>
+    <div class="container">
+        <header>
+            <h1>🎮 FREE GAMES TRACKER</h1>
+            <p>Free games from Epic Games & Steam</p>
+            <div class="stats">
+                <div class="stat-card"><div class="number" id="statActive">0</div><div class="label">Active</div></div>
+                <div class="stat-card"><div class="number" id="statLimited">0</div><div class="label">Limited Time</div></div>
+                <div class="stat-card"><div class="number" id="statPermanent">0</div><div class="label">Permanent</div></div>
             </div>
-            <div class="stat-card">
-                <div class="number" id="statLimited">0</div>
-                <div class="label">Limited Time</div>
-            </div>
-            <div class="stat-card">
-                <div class="number" id="statPermanent">0</div>
-                <div class="label">Permanent</div>
-            </div>
+            <button class="refresh-btn" onclick="loadGames()" id="refreshBtn">🔄 Refresh</button>
+        </header>
+        
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="all" onclick="filterByTab('all')">🎁 All <span class="count" id="count-all">0</span></button>
+            <button class="tab-btn" data-tab="games" onclick="filterByTab('games')">🎮 Games <span class="count" id="count-games">0</span></button>
+            <button class="tab-btn" data-tab="dlc" onclick="filterByTab('dlc')">📦 DLCs <span class="count" id="count-dlc">0</span></button>
+            <button class="tab-btn expired" data-tab="expired" onclick="filterByTab('expired')">⏰ Expired <span class="count" id="count-expired">0</span></button>
         </div>
-
-        <button class="refresh-btn" onclick="loadGames()" id="refreshBtn">
-            🔄 Refresh
-        </button>
-    </header>
-
-    <div class="tabs">
-        <button class="tab-btn active" data-tab="all" onclick="filterByTab('all')">
-            🎁 All <span class="count" id="count-all">0</span>
-        </button>
-        <button class="tab-btn" data-tab="games" onclick="filterByTab('games')">
-            🎮 Games <span class="count" id="count-games">0</span>
-        </button>
-        <button class="tab-btn" data-tab="dlc" onclick="filterByTab('dlc')">
-            📦 DLCs <span class="count" id="count-dlc">0</span>
-        </button>
-        <button class="tab-btn expired" data-tab="expired" onclick="filterByTab('expired')">
-            ⏰ Expired <span class="count" id="count-expired">0</span>
-        </button>
+        
+        <div class="platform-filter" id="platformFilter"></div>
+        
+        <main>
+            <div id="loading" class="loading">⏳ Loading giveaways...</div>
+            <div class="games-grid" id="gamesGrid" style="display:none"></div>
+        </main>
+        
+        <footer><p>Updates every 5 minutes | Epic Games & Steam</p></footer>
     </div>
+    
+    <script>
+        let games = [];
+        let platforms = [];
+        let currentTab = 'all';
+        let currentPlatform = 'all';
 
-    <div class="platform-filter" id="platformFilter"></div>
-
-    <main>
-        <div id="loading" class="loading">⏳ Loading giveaways...</div>
-        <div class="games-grid" id="gamesGrid" style="display:none"></div>
-    </main>
-
-    <footer>
-        <p>Updates every 5 minutes | Epic Games &amp; Steam</p>
-    </footer>
-</div>
-
-<script>
-    let games = [];
-    let platforms = [];
-    let currentTab = 'all';
-    let currentPlatform = 'all';
-
-    // ------------------------------
-    // IMAGE GALLERY
-    // ------------------------------
-
-    function getGameImages(game) {
-        const rawImages = Array.isArray(game.images)
-            ? game.images
-            : Array.isArray(game.screenshots)
-                ? game.screenshots
-                : [];
-
-        const images = rawImages
-            .map(item => {
-                if (typeof item === 'string') return item;
-
-                if (item && typeof item === 'object') {
-                    return item.url || item.src || item.image_url || '';
-                }
-
-                return '';
-            })
-            .filter(url => {
-                return typeof url === 'string' &&
-                    /^https?:\/\//i.test(url);
-            });
-
-        if (
-            game.image_url &&
-            /^https?:\/\//i.test(game.image_url) &&
-            !images.includes(game.image_url)
-        ) {
-            images.unshift(game.image_url);
-        }
-
-        return [...new Set(images)];
-    }
-
-    function galleryMove(index, direction) {
-        const card = document.querySelector(
-            `.game-card[data-gallery-index="${index}"]`
-        );
-
-        const images = card?._galleryImages;
-
-        if (!card || !images || images.length < 2) return;
-
-        const current = Number(card.dataset.imageIndex || 0);
-        const next = (current + direction + images.length) % images.length;
-
-        showGalleryImage(card, next);
-    }
-
-    function gallerySelect(index, imageIndex) {
-        const card = document.querySelector(
-            `.game-card[data-gallery-index="${index}"]`
-        );
-
-        if (!card || !card._galleryImages) return;
-
-        showGalleryImage(card, imageIndex);
-    }
-
-    function showGalleryImage(card, imageIndex) {
-        const images = card._galleryImages;
-
-        if (!images || !images[imageIndex]) return;
-
-        const img = card.querySelector('.gallery-main-image');
-        const counter = card.querySelector('.gallery-counter');
-        const dots = card.querySelectorAll('.gallery-dot');
-
-        if (!img) return;
-
-        img.style.display = 'block';
-        img.onerror = function () {
-            this.onerror = null;
-            this.style.display = 'none';
-
-            const placeholder = this.nextElementSibling;
-            if (placeholder) placeholder.style.display = 'flex';
-        };
-
-        const placeholder = img.nextElementSibling;
-        if (placeholder) placeholder.style.display = 'none';
-
-        img.src = images[imageIndex];
-        img.alt = `${card.querySelector('.game-title')?.textContent || 'Game'} screenshot ${imageIndex + 1}`;
-
-        card.dataset.imageIndex = String(imageIndex);
-
-        if (counter) {
-            counter.textContent = `${imageIndex + 1} / ${images.length}`;
-        }
-
-        dots.forEach((dot, i) => {
-            dot.classList.toggle('active', i === imageIndex);
-        });
-    }
-
-    // ------------------------------
-    // LOAD DATA
-    // ------------------------------
-
-    async function loadGames() {
-        const btn = document.getElementById('refreshBtn');
-        const loading = document.getElementById('loading');
-        const grid = document.getElementById('gamesGrid');
-
-        btn.disabled = true;
-        btn.textContent = '⏳ Loading...';
-        loading.style.display = 'block';
-        loading.textContent = '⏳ Loading giveaways...';
-
-        try {
-            const res = await fetch('/api/giveaways', {
-                cache: 'no-store'
-            });
-
-            if (!res.ok) {
-                throw new Error(`API returned ${res.status}`);
-            }
-
-            const data = await res.json();
-
-            if (!Array.isArray(data)) {
-                throw new Error('Unexpected API response');
-            }
-
-            games = data;
-            platforms = [...new Set(
-                games.map(g => g.platform).filter(Boolean)
-            )];
-
-            document.getElementById('platformFilter').innerHTML =
-                `<button class="platform-btn ${currentPlatform === 'all' ? 'active' : ''}"
-                    data-platform="all"
-                    onclick="filterByPlatform('all')">All</button>` +
-                platforms.map(p => `
-                    <button class="platform-btn ${currentPlatform === p ? 'active' : ''}"
-                        data-platform="${escapeHtml(p)}"
-                        onclick="filterByPlatform('${escapeJs(p)}')">
-                        ${escapeHtml(p)}
-                    </button>
-                `).join('');
-
-            renderGames();
-            updateStats();
-
-            loading.style.display = 'none';
-            grid.style.display = 'grid';
-            btn.textContent = '🔄 Refresh';
-        } catch (error) {
-            console.error('Failed to load games:', error);
-
-            loading.innerHTML = '<p>❌ Error loading games. Please try again.</p>';
+        async function loadGames() {
+            const btn = document.getElementById('refreshBtn');
+            const loading = document.getElementById('loading');
+            const grid = document.getElementById('gamesGrid');
+            
+            btn.disabled = true;
+            btn.textContent = '⏳ Loading...';
+            loading.style.display = 'block';
             grid.style.display = 'none';
-            btn.textContent = '🔄 Retry';
-        } finally {
-            btn.disabled = false;
-        }
-    }
-
-    // ------------------------------
-    // RENDER CARDS
-    // ------------------------------
-
-    function renderGames() {
-        const grid = document.getElementById('gamesGrid');
-        let filtered = games;
-
-        if (currentTab === 'expired') {
-            filtered = games.filter(g => g.is_expired);
-        } else if (currentTab === 'games') {
-            filtered = games.filter(g => !isDlc(g.title));
-        } else if (currentTab === 'dlc') {
-            filtered = games.filter(g => isDlc(g.title));
-        }
-
-        if (currentPlatform !== 'all') {
-            filtered = filtered.filter(g => g.platform === currentPlatform);
-        }
-
-        if (filtered.length === 0) {
-            grid.innerHTML = `
-                <div class="no-games" style="grid-column:1/-1">
-                    <h2>No games found</h2>
-                    <p>Try another filter or refresh the list.</p>
-                </div>
-            `;
-            return;
-        }
-
-        grid.innerHTML = filtered.map((g, index) => {
-            const tc = g.time_components || {
-                days: 0,
-                hours: 0,
-                minutes: 0,
-                seconds: 0
-            };
-
-            const title = String(g.title || 'Unknown game');
-            const platform = String(g.platform || 'Unknown');
-            const isDlcGame = isDlc(title);
-            const images = getGameImages(g);
-
-            let timeBadge;
-
-            if (g.is_permanent) {
-                timeBadge = `
-                    <span class="time-left-badge permanent">
-                        <span>♾️ Permanent</span>
-                    </span>
-                `;
-            } else if (g.end_date) {
-                const badgeClass = g.is_expired
-                    ? 'expired'
-                    : tc.days === 0 && tc.hours < 24
-                        ? 'urgent'
-                        : tc.days === 0
-                            ? 'soon'
-                            : 'normal';
-
-                timeBadge = `
-                    <span class="time-left-badge ${badgeClass}"
-                          data-end-date="${escapeHtml(g.end_date)}">
-                        <span class="time-display">
-                            ${g.is_expired
-                                ? '<span>⏰ Ended</span>'
-                                : `
-                                    <span class="time-unit">
-                                        <span class="time-value days">${tc.days}</span>
-                                        <span class="time-label">d</span>
-                                    </span>
-                                    <span class="time-unit">
-                                        <span class="time-value hours">${tc.hours}</span>
-                                        <span class="time-label">h</span>
-                                    </span>
-                                    <span class="time-unit">
-                                        <span class="time-value minutes">${tc.minutes}</span>
-                                        <span class="time-label">m</span>
-                                    </span>
-                                    <span class="time-unit">
-                                        <span class="time-value seconds">${tc.seconds}</span>
-                                        <span class="time-label">s</span>
-                                    </span>
-                                `
-                            }
-                        </span>
-                    </span>
-                `;
-            } else {
-                timeBadge = `
-                    <span class="time-left-badge permanent">
-                        <span>♾️ Free</span>
-                    </span>
-                `;
+            
+            try {
+                const res = await fetch('/api/giveaways');
+                games = await res.json();
+                platforms = [...new Set(games.map(g => g.platform))];
+                
+                document.getElementById('platformFilter').innerHTML = 
+                    '<button class="platform-btn active" data-platform="all" onclick="filterByPlatform(\'all\')">All</button>' +
+                    platforms.map(p => `<button class="platform-btn" data-platform="${p}" onclick="filterByPlatform('${p}')">${p}</button>`).join('');
+                
+                renderGames();
+                updateStats();
+                
+                loading.style.display = 'none';
+                grid.style.display = 'grid';
+                btn.textContent = '🔄 Refresh';
+                btn.disabled = false;
+            } catch (e) {
+                loading.innerHTML = '<p>❌ Error loading games.</p>';
+                btn.textContent = '🔄 Retry';
+                btn.disabled = false;
             }
+        }
 
-            const firstImage = images[0] || '';
-            const safeTitle = escapeHtml(title);
-            const safePlatform = escapeHtml(platform);
-            const safeUrl = safeHttpUrl(g.url);
-            const safeOriginalPrice = escapeHtml(g.original_price || '');
-            const safeDescription = escapeHtml(g.description || '');
-
-            const gallery = firstImage
-                ? `
-                    <img src="${escapeHtml(firstImage)}"
-                         alt="${safeTitle}"
-                         class="game-image gallery-main-image"
-                         loading="lazy">
-                    <div class="game-image-placeholder" style="display:none">🎮</div>
-                `
-                : `
-                    <div class="game-image-placeholder" style="display:flex">🎮</div>
-                `;
-
-            const galleryControls = images.length > 1
-                ? `
-                    <button class="gallery-arrow prev"
-                            onclick="event.stopPropagation();galleryMove(${index},-1)"
-                            aria-label="Previous screenshot">‹</button>
-
-                    <button class="gallery-arrow next"
-                            onclick="event.stopPropagation();galleryMove(${index},1)"
-                            aria-label="Next screenshot">›</button>
-
-                    <span class="gallery-counter">1 / ${images.length}</span>
-
-                    <div class="gallery-dots">
-                        ${images.slice(0, 8).map((_, i) => `
-                            <button class="gallery-dot ${i === 0 ? 'active' : ''}"
-                                    onclick="event.stopPropagation();gallerySelect(${index},${i})"
-                                    aria-label="Screenshot ${i + 1}"></button>
-                        `).join('')}
-                    </div>
-                `
-                : '';
-
-            const endDateHtml = g.end_date && !g.is_permanent
-                ? `
-                    <div class="game-end-date">
-                        ${g.is_expired ? '❌ Ended: ' : '⏰ Ends: '}
-                        ${escapeHtml(g.end_date)}
-                    </div>
-                `
-                : '';
-
-            const linkHtml = g.is_expired
-                ? '<span class="game-link expired">🚫 Unavailable</span>'
-                : safeUrl
-                    ? `<a href="${escapeHtml(safeUrl)}"
-                           target="_blank"
-                           rel="noopener noreferrer"
-                           class="game-link">🔗 Get Game</a>`
-                    : '<span class="game-link expired">Link unavailable</span>';
-
-            return `
-                <div class="game-card ${g.is_expired ? 'expired' : ''}"
-                     data-platform="${safePlatform}"
-                     data-type="${isDlcGame ? 'dlc' : 'game'}"
-                     data-status="${g.is_expired ? 'expired' : 'active'}"
-                     data-gallery-index="${index}">
-
+        function renderGames() {
+            const grid = document.getElementById('gamesGrid');
+            let filtered = games;
+            
+            if (currentTab === 'expired') {
+                filtered = games.filter(g => g.is_expired);
+            } else if (currentTab === 'games') {
+                filtered = games.filter(g => !isDlc(g.title));
+            } else if (currentTab === 'dlc') {
+                filtered = games.filter(g => isDlc(g.title));
+            }
+            
+            if (currentPlatform !== 'all') {
+                filtered = filtered.filter(g => g.platform === currentPlatform);
+            }
+            
+            grid.innerHTML = filtered.map(g => {
+                const tc = g.time_components || {days:0,hours:0,minutes:0,seconds:0};
+                const isDlcGame = isDlc(g.title);
+                
+                let timeBadge;
+                if (g.is_permanent) {
+                    timeBadge = '<span class="time-left-badge permanent"><span>♾️ Permanent</span></span>';
+                } else if (g.end_date) {
+                    const badgeClass = g.is_expired ? 'expired' : (tc.days===0 && tc.hours<24 ? 'urgent' : tc.days===0 ? 'soon' : 'normal');
+                    timeBadge = `<span class="time-left-badge ${badgeClass}" data-end-date="${g.end_date}">
+                        <span class="time-display">
+                            ${g.is_expired ? '<span>⏰ Ended</span>' : 
+                                `<span class="time-unit"><span class="time-value days">${tc.days}</span><span class="time-label">d</span></span>
+                                 <span class="time-unit"><span class="time-value hours">${tc.hours}</span><span class="time-label">h</span></span>
+                                 <span class="time-unit"><span class="time-value minutes">${tc.minutes}</span><span class="time-label">m</span></span>
+                                 <span class="time-unit"><span class="time-value seconds">${tc.seconds}</span><span class="time-label">s</span></span>`}
+                        </span>
+                    </span>`;
+                } else {
+                    timeBadge = '<span class="time-left-badge permanent"><span>♾️ Free</span></span>';
+                }
+                
+                return `<div class="game-card ${g.is_expired ? 'expired' : ''}" data-platform="${g.platform}" data-type="${isDlcGame ? 'dlc' : 'game'}" data-status="${g.is_expired ? 'expired' : 'active'}">
                     <div class="game-image-container">
-                        <div class="game-gallery">
-                            ${gallery}
-                            ${galleryControls}
-                        </div>
-
-                        <span class="platform-badge ${platform.toLowerCase() === 'steam' ? 'steam' : 'epic'}">
-                            ${safePlatform}
-                        </span>
-
-                        <span class="content-type-badge ${isDlcGame ? 'dlc' : 'game'}">
-                            ${isDlcGame ? 'DLC' : 'Game'}
-                        </span>
-
+                        ${g.image_url ? `<img src="${g.image_url}" alt="${g.title}" class="game-image" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="game-image-placeholder" style="display:none">🎮</div>` : '<div class="game-image-placeholder">🎮</div>'}
+                        <span class="platform-badge ${g.platform.toLowerCase()}">${g.platform}</span>
+                        <span class="content-type-badge ${isDlcGame ? 'dlc' : 'game'}">${isDlcGame ? 'DLC' : 'Game'}</span>
                         ${timeBadge}
                     </div>
-
                     <div class="game-content">
-                        <h3 class="game-title">${safeTitle}</h3>
-
-                        <div class="game-price">
-                            <span class="original-price">${safeOriginalPrice}</span>
-                            <span class="free-price">FREE</span>
-                        </div>
-
-                        ${endDateHtml}
-
-                        ${safeDescription
-                            ? `<p class="game-description">${safeDescription}</p>`
-                            : ''
-                        }
-
-                        ${linkHtml}
+                        <h3 class="game-title">${g.title}</h3>
+                        <div class="game-price"><span class="original-price">${g.original_price}</span><span class="free-price">FREE</span></div>
+                        ${g.end_date && !g.is_permanent ? `<div class="game-end-date">${g.is_expired ? '❌ Ended: '+g.end_date : '⏰ Ends: '+g.end_date}</div>` : ''}
+                        ${g.description ? `<p class="game-description">${g.description}</p>` : ''}
+                        ${g.is_expired ? '<span class="game-link expired">🚫 Unavailable</span>' : `<a href="${g.url}" target="_blank" class="game-link">🔗 Get Game</a>`}
                     </div>
-                </div>
-            `;
-        }).join('');
+                </div>`;
+            }).join('');
+        }
 
-        // Attach image arrays to the newly rendered cards.
-        grid.querySelectorAll('.game-card[data-gallery-index]').forEach(card => {
-            const index = Number(card.dataset.galleryIndex);
-            const game = filtered[index];
+        function isDlc(title) {
+            const t = title.toLowerCase();
+            return t.includes('dlc') || t.includes('pack') || t.includes('edition') || t.includes('artbook') || t.includes('soundtrack');
+        }
 
-            card._galleryImages = game ? getGameImages(game) : [];
+        function updateStats() {
+            const permanent = games.filter(g => g.is_permanent).length;
+            const limited = games.filter(g => !g.is_permanent && !g.is_expired).length;
+            const expired = games.filter(g => g.is_expired).length;
+            
+            document.getElementById('statActive').textContent = limited + permanent;
+            document.getElementById('statLimited').textContent = limited;
+            document.getElementById('statPermanent').textContent = permanent;
+            
+            const allGames = games.length;
+            const onlyGames = games.filter(g => !isDlc(g.title)).length;
+            const onlyDlcs = games.filter(g => isDlc(g.title)).length;
+            
+            document.getElementById('count-all').textContent = allGames;
+            document.getElementById('count-games').textContent = onlyGames;
+            document.getElementById('count-dlc').textContent = onlyDlcs;
+            document.getElementById('count-expired').textContent = expired;
+        }
 
-            const img = card.querySelector('.gallery-main-image');
+        function filterByTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+            renderGames();
+        }
 
-            if (img) {
-                img.onerror = function () {
-                    this.style.display = 'none';
+        function filterByPlatform(platform) {
+            currentPlatform = platform;
+            document.querySelectorAll('.platform-btn').forEach(b => b.classList.toggle('active', b.dataset.platform === platform));
+            renderGames();
+        }
 
-                    const placeholder = this.nextElementSibling;
-                    if (placeholder) placeholder.style.display = 'flex';
-                };
-            }
-        });
-    }
-
-    // ------------------------------
-    // HELPERS
-    // ------------------------------
-
-    function isDlc(title) {
-        const t = String(title || '').toLowerCase();
-
-        return t.includes('dlc') ||
-            t.includes('pack') ||
-            t.includes('edition') ||
-            t.includes('artbook') ||
-            t.includes('soundtrack');
-    }
-
-    function escapeHtml(value) {
-        return String(value ?? '').replace(/[&<>"']/g, char => ({
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#39;'
-        })[char]);
-    }
-
-    function escapeJs(value) {
-        return String(value ?? '')
-            .replace(/\\/g, '\\\\')
-            .replace(/'/g, "\\'")
-            .replace(/"/g, '\\"')
-            .replace(/[\r\n]/g, ' ');
-    }
-
-    function safeHttpUrl(value) {
-        if (typeof value !== 'string') return '';
-
-        try {
-            const url = new URL(value);
-
-            if (url.protocol === 'https:' || url.protocol === 'http:') {
-                return url.href;
-            }
-        } catch (_) {}
-
-        return '';
-    }
-
-    // ------------------------------
-    // STATISTICS
-    // ------------------------------
-
-    function updateStats() {
-        const permanent = games.filter(g => g.is_permanent).length;
-        const limited = games.filter(g => !g.is_permanent && !g.is_expired).length;
-        const expired = games.filter(g => g.is_expired).length;
-
-        document.getElementById('statActive').textContent = limited + permanent;
-        document.getElementById('statLimited').textContent = limited;
-        document.getElementById('statPermanent').textContent = permanent;
-
-        document.getElementById('count-all').textContent = games.length;
-        document.getElementById('count-games').textContent =
-            games.filter(g => !isDlc(g.title)).length;
-        document.getElementById('count-dlc').textContent =
-            games.filter(g => isDlc(g.title)).length;
-        document.getElementById('count-expired').textContent = expired;
-    }
-
-    // ------------------------------
-    // FILTERS
-    // ------------------------------
-
-    function filterByTab(tab) {
-        currentTab = tab;
-
-        document.querySelectorAll('.tab-btn').forEach(button => {
-            button.classList.toggle('active', button.dataset.tab === tab);
-        });
-
-        renderGames();
-    }
-
-    function filterByPlatform(platform) {
-        currentPlatform = platform;
-
-        document.querySelectorAll('.platform-btn').forEach(button => {
-            button.classList.toggle(
-                'active',
-                button.dataset.platform === platform
-            );
-        });
-
-        renderGames();
-    }
-
-    // ------------------------------
-    // COUNTDOWN TIMER
-    // ------------------------------
-
-    setInterval(() => {
-        const now = new Date();
-
-        document.querySelectorAll('.time-left-badge[data-end-date]').forEach(badge => {
-            const endDate = new Date(badge.dataset.endDate);
-            const diff = endDate - now;
-
-            if (!Number.isFinite(endDate.getTime())) return;
-
-            if (diff <= 0) {
-                badge.className = 'time-left-badge expired';
-                badge.innerHTML = '<span>⏰ Ended</span>';
-
-                const card = badge.closest('.game-card');
-
-                if (card) {
-                    card.classList.add('expired');
-                    card.dataset.status = 'expired';
-
-                    const link = card.querySelector('.game-link');
-
-                    if (link && link.tagName === 'A') {
-                        const unavailable = document.createElement('span');
-                        unavailable.className = 'game-link expired';
-                        unavailable.textContent = '🚫 Unavailable';
-                        link.replaceWith(unavailable);
-                    }
+        setInterval(() => {
+            const now = new Date();
+            document.querySelectorAll('.time-left-badge[data-end-date]').forEach(badge => {
+                const endDate = new Date(badge.dataset.endDate);
+                const diff = endDate - now;
+                if (diff <= 0) {
+                    badge.className = 'time-left-badge expired';
+                    badge.innerHTML = '<span>⏰ Ended</span>';
+                    const card = badge.closest('.game-card');
+                    if (card) { card.classList.add('expired'); card.dataset.status = 'expired'; }
+                    updateStats();
+                } else {
+                    const ts = Math.floor(diff / 1000);
+                    const d = Math.floor(ts / 86400), h = Math.floor((ts % 86400) / 3600), m = Math.floor((ts % 3600) / 60), s = ts % 60;
+                    badge.className = 'time-left-badge ' + (d===0 && h<24 ? 'urgent' : h<24 ? 'soon' : 'normal');
+                    badge.innerHTML = `<span class="time-display">
+                        <span class="time-unit"><span class="time-value days">${d}</span><span class="time-label">d</span></span>
+                        <span class="time-unit"><span class="time-value hours">${h}</span><span class="time-label">h</span></span>
+                        <span class="time-unit"><span class="time-value minutes">${m}</span><span class="time-label">m</span></span>
+                        <span class="time-unit"><span class="time-value seconds">${s}</span><span class="time-label">s</span></span>
+                    </span>`;
                 }
+            });
+        }, 1000);
 
-                updateStats();
-                return;
-            }
-
-            const totalSeconds = Math.floor(diff / 1000);
-            const days = Math.floor(totalSeconds / 86400);
-            const hours = Math.floor((totalSeconds % 86400) / 3600);
-            const minutes = Math.floor((totalSeconds % 3600) / 60);
-            const seconds = totalSeconds % 60;
-
-            badge.className = 'time-left-badge ' +
-                (days === 0 && hours < 24
-                    ? 'urgent'
-                    : days === 0
-                        ? 'soon'
-                        : 'normal');
-
-            badge.innerHTML = `
-                <span class="time-display">
-                    <span class="time-unit">
-                        <span class="time-value">${days}</span>
-                        <span class="time-label">d</span>
-                    </span>
-                    <span class="time-unit">
-                        <span class="time-value">${hours}</span>
-                        <span class="time-label">h</span>
-                    </span>
-                    <span class="time-unit">
-                        <span class="time-value">${minutes}</span>
-                        <span class="time-label">m</span>
-                    </span>
-                    <span class="time-unit">
-                        <span class="time-value">${seconds}</span>
-                        <span class="time-label">s</span>
-                    </span>
-                </span>
-            `;
-        });
-    }, 1000);
-
-    // Auto-refresh every 5 minutes.
-    setInterval(loadGames, 300000);
-
-    // Initial load.
-    loadGames();
-</script>
+        setInterval(() => loadGames(), 300000);
+        loadGames();
+    </script>
 </body>
 </html>
