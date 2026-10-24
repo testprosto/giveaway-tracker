@@ -1,3 +1,4 @@
+
 """Vercel Serverless Function - Giveaway Tracker API."""
 
 import asyncio
@@ -5,12 +6,25 @@ import json
 import os
 from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import quote, urlencode, urlparse
+
 import aiohttp
 
+
 class Giveaway:
-    """Модель раздачи."""
-    def __init__(self, platform, title, price, url, end_date=None, image=None, desc=None, is_permanent=False):
+    """Модель бесплатной игры или раздачи."""
+
+    def __init__(
+        self,
+        platform,
+        title,
+        price,
+        url,
+        end_date=None,
+        image=None,
+        desc=None,
+        is_permanent=False,
+    ):
         self.platform = platform
         self.title = title
         self.original_price = price
@@ -20,247 +34,609 @@ class Giveaway:
         self.image_url = image
         self.description = desc
         self.is_permanent = is_permanent
-        self.time_components = self._get_time() if end_date else {'days': 0, 'hours': 0, 'minutes': 0, 'seconds': 0, 'expired': False}
-        self.is_expired = self._is_expired() if end_date else False
+
+        if end_date:
+            self.time_components = self._get_time()
+            self.is_expired = self._is_expired()
+        else:
+            self.time_components = {
+                "days": 0,
+                "hours": 0,
+                "minutes": 0,
+                "seconds": 0,
+                "expired": False,
+            }
+            self.is_expired = False
+
+    def _parse_end_date(self):
+        """Преобразует дату окончания в datetime."""
+        if not self.end_date:
+            return None
+
+        value = self.end_date.strip()
+
+        if value.endswith("Z"):
+            value = value[:-1] + "+00:00"
+
+        return datetime.fromisoformat(value)
 
     def _get_time(self):
         try:
-            end = datetime.fromisoformat(self.end_date.replace('Z', '+00:00'))
-            now = datetime.now(end.tzinfo) if end.tzinfo else datetime.now()
-            diff = end - now
-            ts = max(0, int(diff.total_seconds()))
-            return {'days': ts//86400, 'hours': (ts%86400)//3600, 'minutes': (ts%3600)//60, 'seconds': ts%60, 'expired': ts<=0}
-        except:
-            return {'days': 0, 'hours': 0, 'minutes': 0, 'seconds': 0, 'expired': True}
+            end = self._parse_end_date()
+
+            if end is None:
+                return {
+                    "days": 0,
+                    "hours": 0,
+                    "minutes": 0,
+                    "seconds": 0,
+                    "expired": False,
+                }
+
+            now = (
+                datetime.now(end.tzinfo)
+                if end.tzinfo
+                else datetime.now()
+            )
+
+            seconds = max(0, int((end - now).total_seconds()))
+
+            return {
+                "days": seconds // 86400,
+                "hours": (seconds % 86400) // 3600,
+                "minutes": (seconds % 3600) // 60,
+                "seconds": seconds % 60,
+                "expired": seconds <= 0,
+            }
+
+        except (ValueError, TypeError, OverflowError):
+            return {
+                "days": 0,
+                "hours": 0,
+                "minutes": 0,
+                "seconds": 0,
+                "expired": True,
+            }
 
     def _is_expired(self):
         try:
-            if not self.end_date:
-                return True
-            end = datetime.fromisoformat(self.end_date.replace('Z', '+00:00'))
-            now = datetime.now(end.tzinfo) if end.tzinfo else datetime.now()
-            return end < now
-        except:
+            end = self._parse_end_date()
+
+            if end is None:
+                return False
+
+            now = (
+                datetime.now(end.tzinfo)
+                if end.tzinfo
+                else datetime.now()
+            )
+
+            return end <= now
+
+        except (ValueError, TypeError, OverflowError):
             return True
 
     def to_dict(self):
         return {
-            'platform': self.platform, 
-            'title': self.title, 
-            'original_price': self.original_price, 
-            'discount_price': self.discount_price, 
-            'url': self.url, 
-            'end_date': self.end_date, 
-            'description': self.description, 
-            'image_url': self.image_url, 
-            'is_expired': self.is_expired, 
-            'time_components': self.time_components,
-            'is_permanent': self.is_permanent
+            "platform": self.platform,
+            "title": self.title,
+            "original_price": self.original_price,
+            "discount_price": self.discount_price,
+            "url": self.url,
+            "end_date": self.end_date,
+            "description": self.description,
+            "image_url": self.image_url,
+            "is_expired": self.is_expired,
+            "time_components": self.time_components,
+            "is_permanent": self.is_permanent,
         }
 
 
+def get_epic_game_url(game):
+    """
+    Возвращает прямую ссылку на игру в Epic Games Store.
+
+    Пример:
+    https://store.epicgames.com/p/sker-ritual-aac702
+
+    Не использует устаревшую страницу поиска.
+    """
+
+    page_slug = None
+
+    # 1. Основной источник: catalogNs.mappings
+    catalog_ns = game.get("catalogNs") or {}
+    mappings = catalog_ns.get("mappings") or []
+
+    if isinstance(mappings, list):
+        for mapping in mappings:
+            if isinstance(mapping, dict):
+                candidate = mapping.get("pageSlug")
+                if candidate:
+                    page_slug = candidate
+                    break
+
+    # 2. Дополнительный источник: offerMappings
+    if not page_slug:
+        offer_mappings = game.get("offerMappings") or []
+
+        if isinstance(offer_mappings, list):
+            for mapping in offer_mappings:
+                if isinstance(mapping, dict):
+                    candidate = mapping.get("pageSlug")
+                    if candidate:
+                        page_slug = candidate
+                        break
+
+    # 3. Резервные поля Epic API
+    if not page_slug:
+        for key in ("productSlug", "urlSlug", "slug"):
+            candidate = game.get(key)
+
+            if isinstance(candidate, str) and candidate.strip():
+                page_slug = candidate.strip()
+                break
+
+    if page_slug:
+        page_slug = str(page_slug).strip()
+
+        # Если API вернул URL целиком, извлекаем путь.
+        if page_slug.startswith(("https://", "http://")):
+            parsed = urlparse(page_slug)
+            page_slug = parsed.path.strip("/").split("/")[-1]
+
+        # Убираем возможный префикс /p/ и другие части пути.
+        page_slug = page_slug.strip("/").split("/")[-1]
+
+        if page_slug and page_slug.lower() not in {
+            "p",
+            "search",
+            "free-games",
+        }:
+            clean_slug = quote(page_slug, safe="-._~")
+
+            # Именно такой формат нужен для прямой ссылки на игру.
+            return f"https://store.epicgames.com/p/{clean_slug}"
+
+    # Если slug отсутствует, не создаём ложную ссылку на конкретную игру.
+    return "https://store.epicgames.com/free-games"
+
+
 async def get_epic(session):
-    """Epic Games Store - временные бесплатные игры."""
+    """Epic Games Store — временные бесплатные игры."""
+
     result = []
+
+    api_url = (
+        "https://store-site-backend-static.ak.epicgames.com/"
+        "freeGamesPromotions"
+    )
+
+    params = {
+        "locale": "ru-RU",
+        "country": "RU",
+        "allowCountries": "RU",
+    }
+
     try:
-        async with session.get("https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions", timeout=10) as r:
-            if r.status != 200:
+        async with session.get(
+            api_url,
+            params=params,
+            timeout=aiohttp.ClientTimeout(total=15),
+        ) as response:
+
+            if response.status != 200:
+                print(f"Epic API status: {response.status}")
                 return result
-            data = await r.json()
-            for game in data.get("data", {}).get("Catalog", {}).get("searchStore", {}).get("elements", []):
-                promos = game.get("promotions")
-                if not promos:
+
+            data = await response.json(content_type=None)
+
+        games = (
+            data.get("data", {})
+            .get("Catalog", {})
+            .get("searchStore", {})
+            .get("elements", [])
+        )
+
+        for game in games:
+            try:
+                promotions = game.get("promotions")
+
+                if not promotions:
                     continue
-                for og in promos.get("promotionalOffers", []):
-                    for offer in og.get("promotionalOffers", []):
-                        discount = offer.get("discountSetting", {}).get("discountPercentage", 100)
-                        if discount == 0:
-                            slug = game.get("productSlug", "")
-                            ns = game.get("namespace", "")
-                            title = game.get("title", "Unknown")
-                            end = offer.get("endDate", "").split("T")[0] if offer.get("endDate") else None
-                            price = offer.get("discountSetting", {}).get("originalPrice", 0)
-                            
-                            img = next((i.get("url") for i in game.get("keyImages", []) if i.get("type") in ["OfferImageWide", "Thumbnail", "DieselStoreFrontWide"]), None)
-                            
-                            url = "https://store.epicgames.com/"
-                            if slug:
-                                clean_slug = slug.split('/')[-1] if '/' in slug else slug
-                                url = f"https://store.epicgames.com/ru/p/{clean_slug}"
-                            elif ns:
-                                url = f"https://store.epicgames.com/ru/search?q={title.replace(' ', '%20')}"
-                            
-                            result.append(Giveaway(
+
+                promotional_groups = (
+                    promotions.get("promotionalOffers") or []
+                )
+
+                game_added = False
+
+                for group in promotional_groups:
+                    offers = group.get("promotionalOffers") or []
+
+                    for offer in offers:
+                        discount_setting = (
+                            offer.get("discountSetting") or {}
+                        )
+
+                        discount = discount_setting.get(
+                            "discountPercentage", 100
+                        )
+
+                        # Только игры с действующей скидкой 100%.
+                        if discount != 0:
+                            continue
+
+                        title = game.get("title", "Unknown")
+
+                        end_date = offer.get("endDate") or None
+
+                        original_price = discount_setting.get(
+                            "originalPrice"
+                        )
+
+                        # В некоторых ответах цена находится
+                        # в другом объекте.
+                        if original_price is None:
+                            price_info = (
+                                game.get("price", {})
+                                .get("totalPrice", {})
+                            )
+                            original_price = price_info.get(
+                                "originalPrice"
+                            )
+
+                        if isinstance(original_price, (int, float)):
+                            price = f"${original_price / 100:.2f}"
+                        else:
+                            price = "N/A"
+
+                        images = game.get("keyImages") or []
+
+                        image = next(
+                            (
+                                item.get("url")
+                                for image_type in (
+                                    "OfferImageWide",
+                                    "DieselStoreFrontWide",
+                                    "Thumbnail",
+                                )
+                                for item in images
+                                if item.get("type") == image_type
+                                and item.get("url")
+                            ),
+                            None,
+                        )
+
+                        # Исправленная генерация прямой ссылки.
+                        url = get_epic_game_url(game)
+
+                        description = (
+                            game.get("description") or ""
+                        )[:300]
+
+                        result.append(
+                            Giveaway(
                                 platform="Epic Games",
                                 title=title,
-                                price=f"${price:.2f}" if price else "N/A",
+                                price=price,
                                 url=url,
-                                end_date=end,
-                                image=img,
-                                desc=(game.get("description") or "")[:200],
-                                is_permanent=False
-                            ))
-                            break
-    except Exception as e:
-        print(f"Epic error: {e}")
+                                end_date=end_date,
+                                image=image,
+                                desc=description,
+                                is_permanent=False,
+                            )
+                        )
+
+                        game_added = True
+                        break
+
+                    if game_added:
+                        break
+
+            except Exception as error:
+                print(
+                    f"Epic game parse error "
+                    f"({game.get('title', 'Unknown')}): {error}"
+                )
+
+    except Exception as error:
+        print(f"Epic error: {error}")
+
     return result
 
 
 async def get_steam(session):
-    """Steam - бесплатные раздачи (100% скидки)."""
+    """Steam — бесплатные игры и игры с временной скидкой 100%."""
+
     result = []
+
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/131.0.0.0 Safari/537.36"
+        ),
+        "Accept": (
+            "text/html,application/xhtml+xml,"
+            "application/xml;q=0.9,*/*;q=0.8"
+        ),
     }
-    
+
+    search_url = "https://store.steampowered.com/search/"
+
+    params = {
+        "maxprice": "free",
+        "specials": "1",
+        "l": "english",
+    }
+
     try:
-        # Страница с бесплатными играми
         async with session.get(
-            "https://store.steampowered.com/search/?maxprice=free&specials=1&l=english",
+            search_url,
+            params=params,
             headers=headers,
-            timeout=10,
-            allow_redirects=True
-        ) as r:
-            if r.status != 200:
-                print(f"Steam status: {r.status}")
+            timeout=aiohttp.ClientTimeout(total=15),
+            allow_redirects=True,
+        ) as response:
+
+            if response.status != 200:
+                print(f"Steam status: {response.status}")
                 return result
-            
-            from bs4 import BeautifulSoup
-            html = await r.text()
-            soup = BeautifulSoup(html, 'lxml')
-            
-            # Ищем все игры в результатах
-            game_rows = soup.select('#search_resultsRows .search_result_row')
-            
-            for game in game_rows[:20]:
-                try:
-                    title_elem = game.select_one('.title')
-                    if not title_elem:
-                        continue
-                    
-                    title = title_elem.get_text(strip=True)
-                    
-                    # Ссылка
-                    link = game.get('href', '')
-                    if not link:
-                        continue
-                    
-                    # Изображение
-                    img_elem = game.select_one('img')
-                    img_url = img_elem.get('src') if img_elem else None
-                    
-                    # Проверяем тип раздачи
-                    discount_elem = game.select_one('.discount_pct')
-                    price_elem = game.select_one('.search_price')
-                    
-                    if discount_elem and discount_elem.get_text(strip=True) == "100%":
-                        # 100% скидка - временная раздача
-                        orig_price_elem = game.select_one('.discount_original_price')
-                        orig_price = orig_price_elem.get_text(strip=True) if orig_price_elem else "N/A"
-                        end_date = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d")
-                        is_permanent = False
-                        desc = "100% Off - Limited Time!"
-                    else:
-                        # Permanent F2P
-                        orig_price = "N/A"
-                        end_date = None
-                        is_permanent = True
-                        desc = "Free to Play"
-                    
-                    result.append(Giveaway(
+
+            html = await response.text()
+
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html, "html.parser")
+
+        game_rows = soup.select(
+            "#search_resultsRows .search_result_row"
+        )
+
+        for game in game_rows[:30]:
+            try:
+                title_element = game.select_one(".title")
+
+                if not title_element:
+                    continue
+
+                title = title_element.get_text(strip=True)
+
+                link = game.get("href", "").strip()
+
+                if not link:
+                    continue
+
+                # Убираем параметры отслеживания из ссылки.
+                parsed_link = urlparse(link)
+
+                if parsed_link.scheme not in ("http", "https"):
+                    continue
+
+                image_element = game.select_one("img")
+
+                image_url = None
+
+                if image_element:
+                    image_url = (
+                        image_element.get("src")
+                        or image_element.get("data-src")
+                    )
+
+                discount_element = game.select_one(
+                    ".discount_pct"
+                )
+
+                if (
+                    discount_element
+                    and discount_element.get_text(strip=True) == "-100%"
+                ):
+                    original_element = game.select_one(
+                        ".discount_original_price"
+                    )
+
+                    original_price = (
+                        original_element.get_text(strip=True)
+                        if original_element
+                        else "N/A"
+                    )
+
+                    # В исходном HTML нет надёжной даты окончания.
+                    # Сохраняем прежнюю логику на 7 дней.
+                    end_date = (
+                        datetime.now() + timedelta(days=7)
+                    ).isoformat(timespec="seconds")
+
+                    is_permanent = False
+                    description = "100% Off - Limited Time!"
+
+                else:
+                    original_price = "N/A"
+                    end_date = None
+                    is_permanent = True
+                    description = "Free to Play"
+
+                result.append(
+                    Giveaway(
                         platform="Steam",
                         title=title,
-                        price=orig_price,
+                        price=original_price,
                         url=link,
-                        image=img_url,
-                        desc=desc,
+                        image=image_url,
+                        desc=description,
                         end_date=end_date,
-                        is_permanent=is_permanent
-                    ))
-                    
-                except Exception as e:
-                    print(f"Steam parse error: {e}")
-                    continue
-    
-    except Exception as e:
-        print(f"Steam error: {e}")
-    
+                        is_permanent=is_permanent,
+                    )
+                )
+
+            except Exception as error:
+                print(f"Steam parse error: {error}")
+                continue
+
+    except Exception as error:
+        print(f"Steam error: {error}")
+
     return result
 
 
-# Load HTML template
+# HTML template
 HTML_TEMPLATE = None
+
+
 def get_template():
+    """Загружает HTML-шаблон сайта."""
+
     global HTML_TEMPLATE
+
     if HTML_TEMPLATE is None:
-        template_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'index.html')
+        template_path = os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "templates",
+            "index.html",
+        )
+
         try:
-            with open(template_path, 'r', encoding='utf-8') as f:
-                HTML_TEMPLATE = f.read()
-        except:
-            HTML_TEMPLATE = "<html><body><h1>Error</h1></body></html>"
+            with open(
+                template_path,
+                "r",
+                encoding="utf-8",
+            ) as file:
+                HTML_TEMPLATE = file.read()
+
+        except OSError as error:
+            print(f"Template error: {error}")
+
+            HTML_TEMPLATE = (
+                "<!DOCTYPE html>"
+                "<html><head><meta charset='utf-8'>"
+                "<title>Giveaway Tracker</title></head>"
+                "<body><h1>Template not found</h1></body></html>"
+            )
+
     return HTML_TEMPLATE
 
 
 class handler(BaseHTTPRequestHandler):
     """HTTP Request Handler for Vercel."""
-    
+
     def do_GET(self):
         parsed = urlparse(self.path)
         path = parsed.path
-        
-        if path == '/api/giveaways':
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Cache-Control', 'max-age=300')
-            self.end_headers()
-            giveaways = asyncio.run(self._collect_giveaways())
-            self.wfile.write(json.dumps(giveaways).encode())
-        
-        elif path == '/api/stats':
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.end_headers()
-            giveaways = asyncio.run(self._collect_giveaways())
-            stats = {'total': len(giveaways), 'by_platform': {}, 'permanent': 0, 'limited': 0, 'expired': 0}
-            for g in giveaways:
-                stats['by_platform'][g['platform']] = stats['by_platform'].get(g['platform'], 0) + 1
-                if g['is_permanent']:
-                    stats['permanent'] += 1
-                elif g['is_expired']:
-                    stats['expired'] += 1
+
+        if path == "/api/giveaways":
+            self._send_json(self._run_collection())
+
+        elif path == "/api/stats":
+            giveaways = self._run_collection()
+
+            stats = {
+                "total": len(giveaways),
+                "by_platform": {},
+                "permanent": 0,
+                "limited": 0,
+                "expired": 0,
+            }
+
+            for game in giveaways:
+                platform = game["platform"]
+
+                stats["by_platform"][platform] = (
+                    stats["by_platform"].get(platform, 0) + 1
+                )
+
+                if game["is_permanent"]:
+                    stats["permanent"] += 1
+                elif game["is_expired"]:
+                    stats["expired"] += 1
                 else:
-                    stats['limited'] += 1
-            self.wfile.write(json.dumps(stats).encode())
-        
+                    stats["limited"] += 1
+
+            self._send_json(stats)
+
         else:
             template = get_template()
+
             self.send_response(200)
-            self.send_header('Content-Type', 'text/html; charset=utf-8')
-            self.send_header('Cache-Control', 'no-cache')
+            self.send_header(
+                "Content-Type",
+                "text/html; charset=utf-8",
+            )
+            self.send_header("Cache-Control", "no-cache")
             self.end_headers()
-            self.wfile.write(template.encode('utf-8'))
-    
+            self.wfile.write(template.encode("utf-8"))
+
+    def _send_json(self, data):
+        """Отправляет JSON-ответ."""
+
+        payload = json.dumps(
+            data,
+            ensure_ascii=False,
+        ).encode("utf-8")
+
+        self.send_response(200)
+        self.send_header(
+            "Content-Type",
+            "application/json; charset=utf-8",
+        )
+        self.send_header(
+            "Cache-Control",
+            "public, max-age=60, s-maxage=300",
+        )
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def _run_collection(self):
+        """Запускает асинхронный сбор данных."""
+
+        try:
+            return asyncio.run(self._collect_giveaways())
+
+        except Exception as error:
+            print(f"Collection error: {error}")
+            return []
+
     async def _collect_giveaways(self):
-        """Собрать все раздачи."""
-        async with aiohttp.ClientSession() as session:
+        """Собирает раздачи с поддерживаемых платформ."""
+
+        timeout = aiohttp.ClientTimeout(total=20)
+
+        async with aiohttp.ClientSession(
+            timeout=timeout
+        ) as session:
+
             results = await asyncio.gather(
                 get_epic(session),
                 get_steam(session),
-                return_exceptions=True
+                return_exceptions=True,
             )
-            all_games = []
-            for r in results:
-                if isinstance(r, list):
-                    all_games.extend(r)
-            # Удаляем дубликаты
-            seen, unique = set(), []
-            for g in all_games:
-                if g.url not in seen:
-                    seen.add(g.url)
-                    unique.append(g)
-            return [g.to_dict() for g in unique]
-    
+
+        all_games = []
+
+        for result in results:
+            if isinstance(result, list):
+                all_games.extend(result)
+            elif isinstance(result, Exception):
+                print(f"Source error: {result}")
+
+        # Удаляем дубликаты по URL.
+        seen = set()
+        unique_games = []
+
+        for game in all_games:
+            if game.url not in seen:
+                seen.add(game.url)
+                unique_games.append(game)
+
+        return [
+            game.to_dict()
+            for game in unique_games
+        ]
+
     def log_message(self, format, *args):
-        print(f"{self.address_string()} - {format % args}")
+        print(
+            f"{self.address_string()} - "
+            f"{format % args}"
+        )
